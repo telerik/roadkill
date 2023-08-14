@@ -1,0 +1,47 @@
+name: Continuous Delivery
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: upload
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+
+    steps:
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ^18.17
+      - name: import secrets
+        id: import-secrets
+        uses: LanceMcCarthy/akeyless-action@v3
+        with:
+          access-id: ${{ secrets.GH_AKEYLESS_ACCESS_ID }}
+          static-secrets: |
+            {
+              "/WebComponents/prod/tokens/GH_TOKEN": "GH_TOKEN",
+              "/WebComponents/prod/tokens/PROGRESS_NPM_REGISTRY_TOKEN": "NPM_TOKEN"
+            }
+          export-secrets-to-environment: false
+      - name: git config
+        run: |
+          git config --global user.email "kendo-bot@progress.com"
+          git config --global user.name "kendo-bot"
+      - name: git checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.import-secrets.outputs.GH_TOKEN }}
+      - name: npm install
+        run: npm ci
+      - name: npm test
+        run: npm test -ws --if-present
+      - name: lerna publish
+        run: npm run lerna:publish
+        env:
+          NPM_TOKEN: ${{ steps.import-secrets.outputs.NPM_TOKEN }}
+          GH_TOKEN: ${{ steps.import-secrets.outputs.GH_TOKEN }}

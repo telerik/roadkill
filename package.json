@@ -1,0 +1,25 @@
+{
+    "name": "roadkill",
+    "workspaces": [
+        "packages/@progress/roadkill"
+    ],
+    "private": true,
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/telerik/roadkill.git"
+    },
+    "scripts": {
+        "example": "cd packages/@progress/roadkill && npm i && node --enable-source-maps example.js",
+        "prepare": "lerna run prepare",
+        "test": "lerna run test",
+        "lerna:publish": "lerna publish --no-private"
+    },
+    "files": [
+        "LICENSE",
+        "README.md",
+        "package.json"
+    ],
+    "devDependencies": {
+        "lerna": "^7.3.0"
+    }
+}
