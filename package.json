@@ -1,0 +1,22 @@
+{
+    "name": "roadkill",
+    "workspaces": [
+        "packages/@progress/roadkill"
+    ],
+    "private": true,
+    "scripts": {
+        "example": "cd packages/@progress/roadkill && npm i && node --enable-source-maps example.js",
+        "prepare": "npm run prepare -w packages/@progress/roadkill",
+        "test": "npm test -ws --if-present",
+        "semantic-release": "semantic-release --dry-run"
+    },
+    "files": [
+        "LICENSE",
+        "README.md",
+        "package.json"
+    ],
+    "devDependencies": {
+        "semantic-release": "^22.0.5",
+        "semantic-release-monorepo": "^7.0.5"
+    }
+}
