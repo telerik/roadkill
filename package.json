@@ -10,9 +10,9 @@
     },
     "scripts": {
         "example": "cd packages/@progress/roadkill && npm i && node --enable-source-maps example.js",
-        "prepare": "npm run prepare -w packages/@progress/roadkill",
-        "test": "npm test -ws --if-present",
-        "semantic-release": "semantic-release --dry-run"
+        "prepare": "lerna run prepare",
+        "test": "lerna run test",
+        "lerna-publish": "lerna version --no-private"
     },
     "files": [
         "LICENSE",
@@ -20,7 +20,6 @@
         "package.json"
     ],
     "devDependencies": {
-        "semantic-release": "^22.0.5",
-        "semantic-release-monorepo": "^7.0.5"
+        "lerna": "^7.3.0"
     }
 }

@@ -38,7 +38,7 @@ jobs:
         run: npm test -ws --if-present
 
       - name: semantic release
-        run: npm run semantic-release
+        run: npm run lerna-publish
         env:
           NPM_TOKEN: ${{ steps.import-secrets.outputs.NPM_TOKEN }}
           GH_TOKEN: ${{ steps.import-secrets.outputs.GH_TOKEN }}
