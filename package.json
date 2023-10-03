@@ -4,6 +4,10 @@
         "packages/@progress/roadkill"
     ],
     "private": true,
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/telerik/roadkill.git"
+    },
     "scripts": {
         "example": "cd packages/@progress/roadkill && npm i && node --enable-source-maps example.js",
         "prepare": "npm run prepare -w packages/@progress/roadkill",
