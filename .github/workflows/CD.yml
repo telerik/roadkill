@@ -28,6 +28,10 @@ jobs:
               "/WebComponents/prod/tokens/PROGRESS_NPM_REGISTRY_TOKEN": "NPM_TOKEN"
             }
           export-secrets-to-environment: false
+      - name: git config
+        run: |
+          git config --global user.email "kendo-bot@progress.com"
+          git config --global user.name "kendo-bot"
       - name: git checkout
         uses: actions/checkout@v4
         with:
