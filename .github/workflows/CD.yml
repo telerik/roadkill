@@ -14,18 +14,9 @@ jobs:
       packages: read
 
     steps:
-      - name: git checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ steps.import-secrets.outputs.GH_TOKEN }}
-          
       - uses: actions/setup-node@v3
         with:
-          node-version: ^18.17
-      - name: npm install
-        run: npm ci
-      - name: npm test
-        run: npm test -ws --if-present
+          node-version: ^18.
       - name: import secrets
         id: import-secrets
         uses: LanceMcCarthy/akeyless-action@v3
@@ -37,6 +28,15 @@ jobs:
               "/WebComponents/prod/tokens/PROGRESS_NPM_REGISTRY_TOKEN": "NPM_TOKEN"
             }
           export-secrets-to-environment: false
+      - name: git checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ steps.import-secrets.outputs.GH_TOKEN }}
+      - name: npm install
+        run: npm ci
+      - name: npm test
+        run: npm test -ws --if-present
+
       - name: semantic release
         run: npm run semantic-release
         env:
