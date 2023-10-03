@@ -1,0 +1,23 @@
+{
+    "version": "independent",
+    "npmClient": "npm",
+    "packages": [
+        "packages/@progress/roadkill"
+    ],
+    "command": {
+        "bootstrap": {
+            "graphType": "all"
+        },
+        "clean": {
+            "graphType": "all"
+        },
+        "version": {
+            "graphType": "all",
+            "conventionalCommits": true,
+            "message": "chore(release): publish",
+            "gitTagVersion": true,
+            "push": true,
+            "yes": true
+        }
+    }
+}
