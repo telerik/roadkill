@@ -1,4 +1,5 @@
 {
     "branches": ["main"],
-    "extends": "semantic-release-monorepo"
+    "extends": "semantic-release-monorepo",
+    "repositoryUrl": "git@github.com:telerik/roadkill.git"
 }
