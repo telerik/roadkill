@@ -36,10 +36,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ steps.import-secrets.outputs.GH_TOKEN }}
+      - name: install virtual display
+        run: sudo apt-get install xvfb
       - name: npm install
         run: npm ci
       - name: npm test
-        run: npm test -ws --if-present
+        run: xvfb-run --auto-servernum npm test -ws --if-present
       - name: lerna publish
         run: npm run lerna:publish
         env:

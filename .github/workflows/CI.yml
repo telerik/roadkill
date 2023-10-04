@@ -7,16 +7,19 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v3
         with:
           node-version: ^18.17
+      - name: install virtual display
+        run: sudo apt-get install xvfb
       - name: npm install
         run: npm ci
       - name: npm test
-        run: npm test -ws --if-present
+        run: xvfb-run --auto-servernum npm test -ws --if-present
       - name: npm pack
         run: npm pack --ws
       - name: upload artefacts

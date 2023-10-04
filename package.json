@@ -1,7 +1,8 @@
 {
     "name": "roadkill",
     "workspaces": [
-        "packages/@progress/roadkill"
+        "packages/@progress/roadkill",
+        "examples/jest-web"
     ],
     "private": true,
     "repository": {

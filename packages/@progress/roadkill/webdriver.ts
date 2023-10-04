@@ -1,4 +1,4 @@
-import type { Disposable } from "./utils.js";
+import { withImplicitSignal, type Disposable } from "./utils.js";
 
 /**
  * [6.6 Errors](https://www.w3.org/TR/webdriver2/#errors)
@@ -463,12 +463,26 @@ export interface Serializer {
     deserialize?(value: any): any;
 }
 
+export interface WebDriverClientOptions {
+    address: string;
+    enableLogging?: boolean;
+    logPrefix?: string;
+}
+
 /**
  * A [Local end](https://www.w3.org/TR/webdriver2/#nodes) node implementation of the WebDriver specification.
  */
 export class WebDriverClient {
 
-    public constructor(public readonly address: string, public readonly fetchImplementation: typeof fetch = fetch) {
+    public useImplicitSignal = true;
+
+    public constructor(public readonly options: WebDriverClientOptions, public readonly fetchImplementation: typeof fetch = fetch) {
+    }
+
+    get prefix() { return this.options.logPrefix ?? "[WebDriverClient]" }
+
+    protected log(line: string) {
+        if (this.options?.enableLogging) console.log(`${this.prefix ? this.prefix + " " : ""}${line}`);
     }
 
     /**
@@ -503,23 +517,27 @@ export class WebDriverClient {
         try {
             const requestInit: RequestInit = {};
             requestInit.method = method;
+            signal = withImplicitSignal(signal, this.useImplicitSignal);
             if (signal) requestInit.signal = signal;
             if (args !== undefined) requestInit.body = JSON.stringify(args, serializer?.serialize && ((key, value) => serializer.serialize(value)))
-            const response = await this.fetchImplementation(`${this.address}${uri}`, requestInit);
+            
+            this.log(`fetch: ${method} ${uri}${args !== undefined ? " " + requestInit.body.toString().substring(0, 40) : ""}`);
+            const response = await this.fetchImplementation(`${this.options.address}${uri}`, requestInit);
 
+            this.log(`  response: ${method} ${response.status} ${response.statusText} ${uri}${args !== undefined ? " " + requestInit.body.toString().substring(0, 40) : ""}`);
             if (!response.ok) {
                 throw new WebDriverRequestError(await response.json() as ErrorResult);
             }
 
             const text = await response.text()
             const json = JSON.parse(text, serializer?.deserialize && ((key, value) => serializer.deserialize(value)));
-            // console.log(`API ${method} ${uri} ${JSON.stringify(args)}, result json: ${JSON.stringify(json)}`);
             const result = (json as { value: Result }).value;
             return result;
         } catch(cause) {
             const error = cause instanceof WebDriverRequestError ? cause : new WebDriverRequestError("WebDriver API call failed.", { cause });
-            error["address"] = this.address;
+            error["address"] = this.options.address;
             error["command"] = `${method} ${uri}`;
+            this.log(`  error: ${error.message}`);
             throw error;
         }
     }
@@ -1285,7 +1303,7 @@ export class Element implements WebElementReference {
      */
     public async click(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/element/${this.elementId}/click`, undefined, signal);
+            return await this.request("POST", `/session/${this.sessionId}/element/${this.elementId}/click`, {}, signal);
         } catch(cause) {
             throw new WebDriverMethodError(`Failed to click element.`, { cause });
         }
