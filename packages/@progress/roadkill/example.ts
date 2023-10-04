@@ -35,7 +35,7 @@ process.on("uncaughtException", async (e) => {
     } finally {}
 });
 
-throw new Error("Fail fast!");
+// throw new Error("Fail fast!");
 
 console.log(`Timeouts: ${JSON.stringify(await session.getTimeouts(), null, "  ")}`);
 console.log(`Set implicit timeout to 5000`);
