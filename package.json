@@ -12,7 +12,7 @@
         "example": "cd packages/@progress/roadkill && npm i && node --enable-source-maps example.js",
         "prepare": "lerna run prepare",
         "test": "lerna run test",
-        "lerna:publish": "lerna publish --no-private"
+        "lerna:publish": "lerna publish --no-private --no-verify-access --yes"
     },
     "files": [
         "LICENSE",
