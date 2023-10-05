@@ -79,3 +79,28 @@ WebDriverMethodError: Failed to print page.
   }
 }
 ```
+
+### Pros and Cons
+#### Today, 05 Oct 2023
+I am using TypeScript for code type checking and auto completions.
+I was trying to find how a certain `find` method works on a famous automation framework. I mouse over the `find` in:
+``` TypeScript
+    /**
+     * Locates a tab in the editor area by title containing the {@link title} string.
+     * Note the search does not do a complete match, but looks for a substring.
+     * @param title 
+     * @returns 
+     */
+    public async waitForTab(title: string): Promise<void> {
+        const tabLocator = By.css(`.tabs-and-actions-container .tab[aria-label*="${Escape.cssEscape(title)}"]`);
+        await this.find(tabLocator, 20000);
+    }
+```
+And then the VS Code IDE opens a private package in a `web-app.d.ts` file. I open the `web-app.js` by hand, go to `find()` only to see the transpiled TypeScript to JavaScript:
+```JavaScript
+ find(locator, timeout = 10000, pollTimeout = 25) {
+        return __awaiter(this, void 0, void 0, function* () {
+```
+Somewhere there is `yield this.driver.wait(***_webdriver_1.until.elementLocated(locator)`, ctrl + click again, sent to `node_modules/@types/<3rd-party>/<module.d.ts>`. Navigate by hand again back from `node_modules/@types/<3rd-party>` to `node_modules/<3rd-party>`.
+
+With a thin framework, like ***roadkill***, targeting TypeScript, ctrl + click will send you to .ts code. And without multiple layers of abstraction, you won't get lost in polymorphic calls.
