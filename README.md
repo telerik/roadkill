@@ -81,7 +81,8 @@ WebDriverMethodError: Failed to print page.
 ```
 
 ### Pros and Cons
-#### Today, 05 Oct 2023
+#### TypeScript First
+> Today, 05 Oct 2023
 I am using TypeScript for code type checking and auto completions.
 I was trying to find how a certain `find` method works on a famous automation framework. I mouse over the `find` in:
 ``` TypeScript
@@ -104,3 +105,31 @@ And then the VS Code IDE opens a private package in a `web-app.d.ts` file. I ope
 Somewhere there is `yield this.driver.wait(***_webdriver_1.until.elementLocated(locator)`, ctrl + click again, sent to `node_modules/@types/<3rd-party>/<module.d.ts>`. Navigate by hand again back from `node_modules/@types/<3rd-party>` to `node_modules/<3rd-party>`.
 
 With a thin framework, like ***roadkill***, targeting TypeScript, ctrl + click will send you to .ts code. And without multiple layers of abstraction, you won't get lost in polymorphic calls.
+
+Imagine you could hold ***ctrl*** and point over your testing framework and see what exactly happens ***under-the-hood***:
+![](./images/pros-and-cons/typescript-by-default.png)
+
+#### Compile-Time Checking
+> Today, 05 Oct 2023
+
+A test of mine is flaky. The test fails, I capture a screenshot and attach that to the test artifacts.
+
+```
+ - Create Kendo UI for Angular Application › default theme
+
+    TimeoutError: Failed to find element located by By(xpath, //h3[text()="Kendo UI Template Wizard"]).
+
+    Wait timed out after 45021ms
+```
+
+Several other elements tests like this passed successfully. The screenshot shows the element visibly is there. And I am trying to find out why the `find()` method would fail.
+
+There is so much type checking boilerplate:
+
+``` JavaScript
+    if (typeof timeout !== 'number' || timeout < 0) {
+      throw TypeError('timeout must be a number >= 0: ' + timeout)
+    }
+```
+
+With TypeScript you just annotate `find(timeout: number)` and focus on the application logic.
