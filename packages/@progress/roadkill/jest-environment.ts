@@ -39,6 +39,7 @@ class TestEnvironment extends BaseEnvironment {
             case "hook_start": return "Hook start";
             case "hook_success": return "Hook success";
             case "test_start": return "Test start";
+            case "test_skip": return "Test skipped";
             case "test_started": return "Test started";
             case "test_started": return "Test started";
             case "test_fn_start": return "Test function started";
