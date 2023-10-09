@@ -1,0 +1,29 @@
+{
+  "name": "jest-web",
+  "version": "0.0.1",
+  "description": "Example using jest and roadkill",
+  "type": "module",
+  "private": "true",
+  "scripts": {
+    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --detectOpenHandles --forceExit"
+  },
+  "devDependencies": {
+    "@jest/globals": "^29.7.0",
+    "@progress/roadkill": "^0.0.4",
+    "@types/jest": "^29.5.5",
+    "@types/node": "^20.8.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.2.2"
+  },
+  "license": "MIT",
+  "jest": {
+    "preset": "ts-jest/presets/default-esm",
+    "testEnvironment": "@progress/roadkill/jest-environment.ts",
+    "globals": {
+      "roadkillEnableLogging": true,
+      "roadkillJestLifecycleLogging": true,
+      "roadkillJestConsoleDefault": true
+    }
+  }
+}

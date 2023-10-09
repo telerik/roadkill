@@ -2,7 +2,8 @@
     "version": "independent",
     "npmClient": "npm",
     "packages": [
-        "packages/@progress/roadkill"
+        "packages/@progress/roadkill",
+        "examples/jest-web"
     ],
     "command": {
         "bootstrap": {

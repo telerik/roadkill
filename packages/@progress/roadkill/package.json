@@ -26,6 +26,8 @@
         "@types/node": "^20.6.2",
         "@types/plist": "^3.0.3",
         "@types/yargs": "^17.0.25",
+        "jest": "^29.7.0",
+        "tree-kill": "^1.2.2",
         "typescript": "^5.2.2"
     },
     "files": [
@@ -43,6 +45,12 @@
         "utils.ts",
         "chromedriver.js",
         "chromedriver.js.map",
-        "chromedriver.ts"
+        "chromedriver.ts",
+        "jest-environment.ts",
+        "jest-environment.js.map",
+        "jest-environment.js",
+        "server.ts",
+        "server.js.map",
+        "server.js"
     ]
 }
