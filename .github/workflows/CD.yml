@@ -41,7 +41,7 @@ jobs:
       - name: npm install
         run: npm ci
       - name: npm test
-        run: xvfb-run --auto-servernum npm test -ws --if-present
+        run: xvfb-run --auto-servernum npm test
       - name: lerna publish
         run: npm run lerna:publish
         env:

@@ -4,6 +4,10 @@
         "packages/@progress/roadkill",
         "examples/jest-web"
     ],
+    "engines": {
+        "node": "^18.17.0",
+        "npm": "^9.9.0"
+    },
     "private": true,
     "repository": {
         "type": "git",
@@ -11,9 +15,9 @@
     },
     "scripts": {
         "example": "cd packages/@progress/roadkill && npm i && node --enable-source-maps example.js",
-        "prepare": "lerna run prepare",
         "test": "lerna run test",
-        "lerna:publish": "lerna publish --no-private --no-verify-access --yes"
+        "lerna:version": "lerna version --no-git-tag-version --no-push",
+        "lerna:publish": "lerna publish"
     },
     "files": [
         "LICENSE",

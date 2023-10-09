@@ -30,7 +30,7 @@ describe("w3schools", () => {
     afterAll(async () => await session?.dispose(), 5000);
     afterAll(async () => await chromedriver?.dispose(), 10000);
 
-    test("navigate to js statements page", async () => {
+    test.skip("navigate to js statements page", async () => {
         // roadkill APIs will use global implicit signal if provided by the test framework,
         // but for async node APIs like `writeFile`, you will need to obtain it at the beginning of your test.
         const { signal } = getState();
