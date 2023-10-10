@@ -51,7 +51,7 @@ export class ChromeDriver extends Server<ChromeDriverOptions> {
 
     private startupLine: string[] = [];
     
-    public override get prefix() { return this.options?.logPrefix ?? "ChromeDriver" }
+    protected override get defaultPrefix() { return "ChromeDriver"; }
     public get address() { return this._address; }
 
     protected spawn(): ChildProcessWithoutNullStreams {

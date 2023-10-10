@@ -40,7 +40,7 @@ export interface ServerOptions {
  *  - ChromeDriver.exe
  *  - React dev server at: `react-scripts start`
  */
-export abstract class Server<Options extends ServerOptions> extends EventEmitter implements Disposable  {
+export abstract class Server<Options> extends EventEmitter implements Disposable  {
 
     private _state: ServerState = "new";
 
@@ -50,7 +50,7 @@ export abstract class Server<Options extends ServerOptions> extends EventEmitter
     private closed = false;
     private abortReason: any;
 
-    constructor(protected readonly options: Options) {
+    constructor(protected readonly options: Options & ServerOptions) {
         super();
     }
 
@@ -72,7 +72,9 @@ export abstract class Server<Options extends ServerOptions> extends EventEmitter
         this.emit("state", value);
     }
 
-    public get prefix() { return this.options?.logPrefix ?? "Server" }
+    protected abstract get defaultPrefix(): string;
+
+    public get prefix() { return this.options?.logPrefix ?? this.defaultPrefix }
 
     public async start(signal?: AbortSignal, useImplicitSignal?: boolean) {
         if (this.state != "new") throw new Error("Can only start once.");
