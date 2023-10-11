@@ -24,6 +24,11 @@
       "roadkillEnableLogging": true,
       "roadkillJestLifecycleLogging": true,
       "roadkillJestConsoleDefault": true
-    }
+    },
+    "reporters": [
+      "default",
+      "@progress/roadkill/jest-reporter.ts"
+    ],
+    "verbose": true
   }
 }

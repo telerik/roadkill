@@ -29,25 +29,24 @@ class TestEnvironment extends BaseEnvironment {
 
     private displayFriendlyEventName(name: string) {
         switch(name) {
-            case "setup": return "Setup";
-            case "add_hook": return "Add hook";
-            case "add_test": return "Add test";
-            case "start_describe_definition": return "Start describe definition";
-            case "finish_describe_definition": return "Finish describe definition";
-            case "run_describe_start": return "Run describe start";
-            case "run_describe_start": return "Run describe start";
+            case "setup": return undefined;
+            case "add_hook": return undefined;
+            case "add_test": return undefined;
+            case "start_describe_definition": return undefined;
+            case "finish_describe_definition": return undefined;
+            case "run_start": return undefined;
+            case "run_describe_start": return undefined;
             case "hook_start": return "Hook start";
             case "hook_success": return "Hook success";
             case "test_start": return "Test start";
-            case "test_skip": return "Test skipped";
-            case "test_started": return "Test started";
-            case "test_started": return "Test started";
+            case "test_skip": return undefined;
+            case "test_started": return undefined;
             case "test_fn_start": return "Test function started";
             case "test_fn_failure": return "Test function failure";
             case "test_done": return "Test done";
-            case "run_describe_finish": return "Run describe finish";
-            case "run_finish": return "Run finish";
-            case "teardown": return "Teardown";
+            case "run_describe_finish": return undefined;
+            case "run_finish": return undefined;
+            case "teardown": return undefined;
             default: return name;
         }
     }
@@ -59,8 +58,21 @@ class TestEnvironment extends BaseEnvironment {
         if (event.name == "setup" && this.global.roadkillJestConsoleDefault) {
             this.global.console = consoleModule;
         }
+
+        if (process.env["GITHUB_ACTIONS"]) {
+            if (event.name == "test_start") {
+                console.log();
+                console.log(`::group:: TEST ${nameStack?.join(" ")}`);
+            }
+
+            if (event.name == "test_done") {
+                console.log(`::endgroup::`);
+            }
+        }
+
         if (this.global.roadkillJestLifecycleLogging) {
-            console.log(`[JEST] ${this.displayFriendlyEventName(event.name)}${event?.hook?.type ? " " + event?.hook?.type : ""}${nameStack.length ? " (" + nameStack.join(" > ") + ")" : ""}`);
+            const name = this.displayFriendlyEventName(event.name);
+            if (name) console.log(`[JEST] ${this.displayFriendlyEventName(event.name)}${event?.hook?.type ? " " + event?.hook?.type : ""}${nameStack.length ? " (" + nameStack.join(" ") + ")" : ""}`);
         }
         
         switch (event.name) {
