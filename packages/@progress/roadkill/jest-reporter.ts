@@ -2,10 +2,18 @@
 
 class Reporter {
     onTestCaseStart(test, testCaseStartInfo) {
-        // console.log(`[JEST] TEST ${testCaseStartInfo.fullName}`);
+        let nameStack = [...testCaseStartInfo.ancestorTitles, testCaseStartInfo.title];
+        let name = '"' + nameStack.join('" > "') + '"';
+        console.log(`[JEST] START: ${name}...`);
     }
+
     onTestCaseResult(test, testCaseResult) {
-        console.log(`[JEST] ${testCaseResult.status.toUpperCase()} (${testCaseResult.title}) in ${testCaseResult.duration}ms.`);
+
+        let nameStack = [...testCaseResult.ancestorTitles, testCaseResult.title];
+        let name = '"' + nameStack.join('" > "') + '"';
+
+        console.log(`[JEST] ${testCaseResult.status.toUpperCase()}: ${name} (in ${testCaseResult.duration}ms.)`);
+
         if (testCaseResult.failureMessages) {
             for(const message of testCaseResult.failureMessages) {
                 console.log("    " + message.split("\n").join("    \n"));
@@ -15,5 +23,3 @@ class Reporter {
 }
 
 module.exports = Reporter;
-
-// export default Reporter;
