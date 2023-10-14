@@ -133,3 +133,21 @@ There is so much type checking boilerplate:
 ```
 
 With TypeScript you just annotate `find(timeout: number)` and focus on the application logic.
+
+#### Get The Stack
+> Today, 14 Oct 2023
+
+I am getting a test fail report from one of my e2e:
+```
+StaleElementReferenceError: stale element reference: stale element not found
+      (Session info: chrome=114.0.5735.289)
+
+      at Object.throwDecodedError (node_modules/selenium-webdriver/lib/error.js:524:15)
+      at parseHttpResponse (node_modules/selenium-webdriver/lib/http.js:587:13)
+      at Executor.execute (node_modules/selenium-webdriver/lib/http.js:515:28)
+      at async Driver.execute (node_modules/selenium-webdriver/lib/webdriver.js:745:17)
+```
+
+What is wrong with it? None of the lines have anything to do with my code. This usually boils down to a "find + click" pair that execute in two separate requests to the WebDriver and in between dynamic UI had changed. If only the underlying framework wasn't using excessive amounts of abstractions.
+
+So where did it fail? No idea!
