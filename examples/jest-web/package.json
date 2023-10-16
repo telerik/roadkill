@@ -20,9 +20,11 @@
   "jest": {
     "preset": "ts-jest/presets/default-esm",
     "testEnvironment": "@progress/roadkill/jest-environment.ts",
+    "reporters": [
+      "summary"
+    ],
     "globals": {
-      "roadkillEnableLogging": true,
-      "roadkillJestLifecycleLogging": true,
+      "roadkillEnableLogging": false,
       "roadkillJestConsoleDefault": true
     }
   }
