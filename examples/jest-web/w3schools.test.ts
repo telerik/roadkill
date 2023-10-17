@@ -1,6 +1,6 @@
 import { ChromeDriver } from "@progress/roadkill/chromedriver.js";
 import { Session, WebDriverClient, by } from "@progress/roadkill/webdriver.js";
-import { describe, expect } from "@jest/globals";
+import { describe, test, expect } from "@jest/globals";
 import { delay, getState } from "@progress/roadkill/utils.js";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
