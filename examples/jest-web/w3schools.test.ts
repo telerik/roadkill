@@ -15,7 +15,7 @@ describe("w3schools", () => {
 
     beforeAll(async () => {
         const { signal } = getState();
-        chromedriver = new ChromeDriver({ args: ["--port=5024"], enableLogging });
+        chromedriver = new ChromeDriver({ args: ["--port=5027"], enableLogging });
         await chromedriver.start();
         webdriver = new WebDriverClient({ address: chromedriver.address, enableLogging });
         session = await webdriver.newSession({
@@ -26,6 +26,14 @@ describe("w3schools", () => {
             }
         });
     }, 30000);
+
+    afterEach(async () => {
+        const { signal, test, hook } = getState();
+        if (test && test.status == "fail") {
+            console.log("post-mortem collecting test failure artifacts for: " + test.names.join(" > "));
+            // For example try to capture screenshot from session...
+        }
+    });
 
     afterAll(async () => await session?.dispose(), 5000);
     afterAll(async () => await chromedriver?.dispose(), 10000);
