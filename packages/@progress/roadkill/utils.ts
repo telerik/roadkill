@@ -11,7 +11,7 @@ export type URL = string;
 /**
  * Returns a promise that gets resolved in {@link milliseconds}, unless cancelled by the {@link signal}.
  */
-export async function delay(milliseconds: number, signal?: AbortSignal, overrideUseImplicitSignal?: boolean): Promise<void> {
+export async function sleep(milliseconds: number, signal?: AbortSignal, overrideUseImplicitSignal?: boolean): Promise<void> {
     signal = withImplicitSignal(signal, overrideUseImplicitSignal);
     try {
         await new Promise<void>((resolve, reject) => {
@@ -96,4 +96,185 @@ export function getState(): State {
         test: global["@progress/roadkill/utils:test"],
         hook: global["@progress/roadkill/utils:hook"]
     };
+}
+
+class StepError extends Error {
+}
+
+/**
+ * Formats duration given in milliseconds to user friendly string.
+ * Tests run in seconds usually so for ranges:
+ * 0 to 999ms - will print "XXXms"
+ * 1 sec to 60 sec - will print "SS.XXX sec."
+ * 60+ sec - will print "MM:SS.XXX min."
+ */
+export function formatDuration(duration: number) {
+
+    const milliseconds = duration % 1000;
+    const seconds = Math.floor(duration / 1000) % 60;
+    const minutes = Math.floor(duration / 60000);
+
+    let format = "";
+
+    let printedMs = false;
+    if (duration < 1000) {
+        format = milliseconds.toString() + " ms.";
+        printedMs = true;
+    } else if (duration >= 1000 && duration < 10000) {
+        if (milliseconds >= 0 && milliseconds <= 9) {
+            format = "00" + milliseconds.toString();
+            printedMs = true;
+        } else if (milliseconds >= 10 && milliseconds <= 99) {
+            format = "0" + milliseconds.toString();
+            printedMs = true;
+        } else {
+            format = milliseconds.toString();
+            printedMs = true;
+        }
+    } else {
+        // For more than 10 seconds task, don't print milliseconds...
+    }
+
+    if (duration >= 1000) {
+        if (duration >= 60000) {
+            if (seconds >= 0 && seconds <= 9) {
+                format = "0" + seconds.toString() + (printedMs ? "." + format : "");
+            } else {
+                format = seconds.toString() + (printedMs ? "." + format : "");
+            }
+        } else {
+            format = seconds.toString() + (printedMs ? "." + format : "") + " sec.";
+        }
+    }
+
+    if (duration >= 60000) {
+        format = minutes.toString() + ":" + format + " min.";
+    }
+
+    return format;
+}
+
+const color = process.env.FORCE_COLOR || (!process.env.NO_COLOR);
+const gray = color ? (text: string) => `\x1b[90m${text}\x1b[0m` : (text: string) => text;
+const green = color ? (text: string) => `\x1b[32m${text}\x1b[0m` : (text: string) => text;
+const red = color ? (text: string) => `\x1b[31m${text}\x1b[0m` : (text: string) => text;
+
+const baseConsole = console;
+global.console = Object.setPrototypeOf({
+    group() {
+        Step.flushSteps();
+        super.group(...arguments);
+    },
+    log() {
+        Step.flushSteps();
+        super.log(...arguments);
+    }
+}, baseConsole);
+
+class Step {
+    private static stack: Step[] = [];
+
+    private name: string;
+    private startTime: number;
+    private parent: Step;
+    private children: Step[] = [];
+    private beginPrinted: boolean = false;
+    private timeout: NodeJS.Timeout;
+    private interval: NodeJS.Timeout;
+    private level: number;
+
+    static push(name: string): Step {
+        const step = new Step();
+        step.name = name;
+        step.level = Step.stack.length;
+        step.parent = step.level ? Step.stack[step.level - 1] : undefined;
+        step.startTime = Date.now();
+        step.timeout = setTimeout(() => step.onTimeout(), 5000);
+        step.interval = setInterval(() => step.onInterval(), 10000);
+        Step.stack.push(step);
+        return step;
+    }
+
+    static flushSteps(to: Step = undefined) {
+        if (to && Step.stack.indexOf(to) == -1) throw new Error(`Flushing a step '${step.name}' that is not on the stack.`);
+        for (const step of Step.stack) {
+            if (!step.beginPrinted) step.begin();
+            if (step == to) break;
+        }
+    }
+
+    static onInterval = () => {
+        if (Step.stack.length == 0) throw new Error("Getting life-beat ticks while Step stack is empty.");
+        const step = Step.stack[Step.stack.length - 1];
+        if (step.beginPrinted) {
+
+        } else {
+            Step.flushSteps();
+        }
+    }
+
+    onTimeout() {
+        Step.flushSteps(this);
+        this.timeout = undefined;
+    }
+
+    onInterval() {
+        if (this.beginPrinted && this == Step.stack[Step.stack.length - 1]) {
+            baseConsole.groupEnd();
+            baseConsole.group(`${gray("⋮")} ${this.name}${gray(` (so far ${formatDuration(Date.now() - this.startTime)})`)}`);
+        }
+    }
+
+    begin() {
+        if (this.beginPrinted) return;
+        this.beginPrinted = true;
+        baseConsole.group(`${gray("▾")} ${this.name} ...`);
+    }
+
+    resolve() {
+        if (Step.stack.length == 0 || Step.stack[Step.stack.length - 1] != this)
+            throw new Error(`Error on step resolve '${this.name}', it is not last on the stack.`);
+        Step.stack.pop();
+        if (this.timeout) {
+            clearTimeout(this.timeout);
+            this.timeout = undefined;
+        }
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = undefined;
+        }
+        if (this.beginPrinted) baseConsole.groupEnd();
+        if (this.parent) Step.flushSteps(this.parent);
+        baseConsole.log(`${green("▪")} ${this.name}${gray(` (in ${formatDuration(Date.now() - this.startTime)})`)}`);
+    }
+
+    fail(cause: any) {
+        if (Step.stack.length == 0 || Step.stack[Step.stack.length - 1] != this)
+            throw new Error(`Error on step fail '${this.name}', it is not last on the stack.`);
+        Step.stack.pop();
+        if (this.timeout) {
+            clearTimeout(this.timeout);
+            this.timeout = undefined;
+        }
+        if (this.interval) {
+            clearInterval(this.interval);
+            this.interval = undefined;
+        }
+        if (this.beginPrinted) baseConsole.groupEnd();
+        if (this.parent) Step.flushSteps(this.parent);
+        baseConsole.log(`${red("✗")} ${this.name}${gray(` (in ${formatDuration(Date.now() - this.startTime)})`)}`);
+    }
+}
+
+export async function step<T>(name: string, action: () => T | Promise<T>): Promise<T> {
+    let result: T = undefined;
+    const step = Step.push(name);
+    try {
+        result = await action();
+        step.resolve();
+        return result;
+    } catch(cause) {
+        step.fail(cause);
+        throw cause;
+    }
 }

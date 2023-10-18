@@ -1,7 +1,7 @@
 import { describe, test } from "@jest/globals";
 import { Builder, Browser, WebDriver } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
-import { delay } from "@progress/roadkill/utils.js";
+import { sleep } from "@progress/roadkill/utils.js";
 import { Session, WebDriverClient } from "@progress/roadkill/webdriver.js";
 
 describe("w3schools", () => {
@@ -31,7 +31,7 @@ describe("w3schools", () => {
 
     test.skip("navigate to js statements page", async () => {
         await driver.navigate().to('http://www.w3schools.com');
-        await delay(3000);
+        await sleep(3000);
         await session.navigateTo('http://www.w3schools.com/js')
     }, 20000);
 });
