@@ -1,25 +1,27 @@
 {
-  "name": "jest-web",
-  "version": "0.0.3",
-  "description": "Example using jest and roadkill",
+  "name": "selenium-interop",
+  "version": "0.0.1",
+  "description": "",
   "type": "module",
   "private": "true",
   "scripts": {
     "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --detectOpenHandles --forceExit"
   },
+  "author": "",
+  "license": "MIT",
   "devDependencies": {
-    "@jest/globals": "^29.7.0",
     "@progress/roadkill": "^0.1.2",
     "@types/jest": "^29.5.5",
-    "@types/node": "^20.8.2",
+    "@types/selenium-webdriver": "^4.1.18",
     "jest": "^29.7.0",
-    "ts-jest": "^29.1.1",
-    "typescript": "^5.2.2"
+    "selenium-webdriver": "^4.14.0",
+    "ts-jest": "^29.1.1"
   },
-  "license": "MIT",
   "jest": {
     "preset": "ts-jest/presets/default-esm",
     "testEnvironment": "@progress/roadkill/jest-environment.ts",
-    "reporters": [ "summary" ]
+    "reporters": [
+      "summary"
+    ]
   }
 }

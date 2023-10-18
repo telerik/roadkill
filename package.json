@@ -2,7 +2,8 @@
     "name": "roadkill",
     "workspaces": [
         "packages/@progress/roadkill",
-        "examples/jest-web"
+        "examples/jest-web",
+        "examples/selenium-interop"
     ],
     "engines": {
         "node": "^18.17.0",

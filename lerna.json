@@ -3,7 +3,8 @@
     "npmClient": "npm",
     "packages": [
         "packages/@progress/roadkill",
-        "examples/jest-web"
+        "examples/jest-web",
+        "examples/selenium-interop"
     ],
     "command": {
         "bootstrap": {
