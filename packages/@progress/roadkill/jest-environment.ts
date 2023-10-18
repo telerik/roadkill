@@ -2,6 +2,64 @@ import NodeEnvironment from "jest-environment-node";
 import consoleModule from "console";
 import { relative } from "path";
 
+/**
+ * Formats duration given in milliseconds to user friendly string.
+ * Tests run in seconds usually so for ranges:
+ * 0 to 999ms - will print "XXXms"
+ * 1 sec to 60 sec - will print "SS.XXX sec."
+ * 60+ sec - will print "MM:SS.XXX min."
+ */
+function formatDuration(duration: number) {
+
+    const milliseconds = duration % 1000;
+    const seconds = Math.floor(duration / 1000) % 60;
+    const minutes = Math.floor(duration / 60000);
+
+    let format = "";
+
+    let printedMs = false;
+    if (duration < 1000) {
+        format = milliseconds.toString() + " ms.";
+        printedMs = true;
+    } else if (duration >= 1000 && duration < 10000) {
+        if (milliseconds >= 0 && milliseconds <= 9) {
+            format = "00" + milliseconds.toString();
+            printedMs = true;
+        } else if (milliseconds >= 10 && milliseconds <= 99) {
+            format = "0" + milliseconds.toString();
+            printedMs = true;
+        } else {
+            format = milliseconds.toString();
+            printedMs = true;
+        }
+    } else {
+        // For more than 10 seconds task, don't print milliseconds...
+    }
+
+    if (duration >= 1000) {
+        if (duration >= 60000) {
+            if (seconds >= 0 && seconds <= 9) {
+                format = "0" + seconds.toString() + (printedMs ? "." + format : "");
+            } else {
+                format = seconds.toString() + (printedMs ? "." + format : "");
+            }
+        } else {
+            format = seconds.toString() + (printedMs ? "." + format : "") + " sec.";
+        }
+    }
+
+    if (duration >= 60000) {
+        format = minutes.toString() + ":" + format + " min.";
+    }
+
+    return format;
+}
+
+const color = process.env.FORCE_COLOR || (!process.env.NO_COLOR);
+const gray = color ? (text: string) => `\x1b[90m${text}\x1b[0m` : (text: string) => text;
+const green = color ? (text: string) => `\x1b[32m${text}\x1b[0m` : (text: string) => text;
+const red = color ? (text: string) => `\x1b[31m${text}\x1b[0m` : (text: string) => text;
+
 abstract class Scope {
 
     static scopes: Scope[] = [];
@@ -107,15 +165,47 @@ export interface HookState {
     readonly error?: Error;
 }
 
-class HookScope extends Scope implements HookState {
+class FunctionScope extends Scope {
+
+    public readonly names: ReadonlyArray<string>;
+    public readonly source: string;
+    
+    private sourcePrinted = false;
+    private startTime: number;
+
+    constructor(parent: Scope, name: string, source: string, names: string[]) {
+        super(parent, name);
+        this.source = source;
+        this.names = [...names, name];
+    }
+
+    override begin() {
+        this.startTime = Date.now();
+        super.begin();
+    }
+
+    protected formatSource(): string {
+        if (this.sourcePrinted) return "";
+        this.sourcePrinted = true;
+        try {
+            const base = process.env.INIT_CWD;
+            return gray(", at " + relative(base, this.source));
+        } catch {
+            return gray(", at " + this.source);
+        }
+    }
+
+    protected duration() {
+        return ` (${formatDuration(Date.now() - this.startTime)})`;
+    }
+}
+
+
+class HookScope extends FunctionScope implements HookState {
     private _error: Error;
     private _status: "started" | "fail" | "pass" = "started";
     private conclusionPrinted = false;
-    private sourcePrinted = false;
     private beginWithDotDotDot = false;
-
-    private startTime: number;
-    private endTime: number;
 
     private beginTimeout: NodeJS.Timeout;
     private onTimeout: () => void;
@@ -125,18 +215,8 @@ class HookScope extends Scope implements HookState {
     public get fullName() { return this.names.join(" "); }
     public get hookName() { return this.names[this.names.length - 1]; }
 
-    public readonly names: ReadonlyArray<string>;
-    private readonly source: string;
-
-    constructor(parent: Scope, name: string, source: string, names: string[]) {
-        super(parent, name);
-        this.source = source;
-        this.names = [...names, name];
-    }
-
     override begin(): void {
         super.begin();
-        this.startTime = Date.now();
         this.onTimeout = () => {
             this.beginWithDotDotDot = true;
             this.beginTimeout = undefined;
@@ -172,66 +252,14 @@ class HookScope extends Scope implements HookState {
     toString(): string {
         switch (this._status) {
             case "started":
-                return `\x1b[90m-\x1b[0m ${this.name}${this.formatSource()}`;
+                return `${gray("○")} ${this.name}${this.formatSource()}`;
             case "pass":
                 this.conclusionPrinted = true;
-                return `\x1b[32m✓\x1b[0m ${this.name}${this.formatSource()}`;
+                return `${green("✓")} ${this.name}${this.duration()}${this.formatSource()}`;
             case "fail":
                 this.conclusionPrinted = true;
-                return `\x1b[31m✗\x1b[0m ${this.name}${this.formatSource()}`;
+                return `${red("✗")} ${this.name}${this.duration()}${this.formatSource()}`;
         }
-    }
-
-    formatSource(): string {
-        if (this.sourcePrinted) return "";
-        this.sourcePrinted = true;
-        try {
-            const base = process.env.INIT_CWD;
-            return "\x1b[90m, at " + relative(base, this.source) + "\x1b[0m";
-        } catch {
-            return "\x1b[90m, at " + this.source + "\x1b[0m";
-        }
-    }
-
-    duration() {
-        const duration = Date.now() - this.startTime;
-        const milliseconds = duration % 1000;
-        const seconds = Math.floor(duration / 1000) % 60;
-        const minutes = Math.floor(duration / 60000);
-
-        let format = "";
-
-        if (duration >= 1000) {
-            if (milliseconds >= 0 && milliseconds <= 9) {
-                format = "00" + milliseconds.toString();
-            } else if (milliseconds >= 10 && milliseconds <= 99) {
-                format = "0" + milliseconds.toString();
-            } else {
-                format = milliseconds.toString();
-            }
-        } else {
-            format = milliseconds.toString() + "ms.";
-        }
-
-        if (duration >= 1000) {
-            if (duration >= 60000) {
-                if (seconds >= 0 && seconds <= 9) {
-                    format = "0" + seconds.toString() + "." + format;
-                } else {
-                    format = seconds.toString() + "." + format;
-                }
-            } else {
-                format = seconds.toString() + "." + format + "sec.";
-            }
-        }
-
-        if (duration >= 60000) {
-            format = minutes.toString() + ":" + format + "min.";
-        }
-
-        format = " (" + format + ")";
-
-        return format;
     }
 }
 
@@ -243,16 +271,12 @@ export interface TestState {
     readonly error?: Error;
 }
 
-class TestScope extends Scope implements TestState {
+class TestScope extends FunctionScope implements TestState {
 
     private _error: Error;
     private _status: "started" | "fail" | "pass" = "started";
     private conclusionPrinted = false;
-    private sourcePrinted = false;
     private beginWithDotDotDot = false;
-
-    private startTime: number;
-    private endTime: number;
 
     private beginTimeout: NodeJS.Timeout;
     private onTimeout: () => void;
@@ -262,18 +286,8 @@ class TestScope extends Scope implements TestState {
     public get fullName() { return this.names.join(" "); }
     public get testName() { return this.names[this.names.length - 1]; }
 
-    public readonly names: ReadonlyArray<string>;
-    private readonly source: string;
-
-    constructor(parent: Scope, name: string, source: string, names: string[]) {
-        super(parent, name);
-        this.names = names;
-        this.source = source;
-    }
-
     override begin(): void {
         super.begin();
-        this.startTime = Date.now();
         this.onTimeout = () => {
             this.beginWithDotDotDot = true;
             this.beginTimeout = undefined;
@@ -309,66 +323,14 @@ class TestScope extends Scope implements TestState {
     toString(): string {
         switch (this._status) {
             case "started": 
-                return `\x1b[90m-\x1b[0m ${this.name}${ this.beginWithDotDotDot ? " ... " : ""}${this.formatSource()}`;
+                return `${gray("○")} ${this.name}${ this.beginWithDotDotDot ? " ... " : ""}${this.formatSource()}`;
             case "pass":
                 this.conclusionPrinted = true;
-                return `\x1b[32m✓\x1b[0m ${this.name}${this.duration()}${this.formatSource()}`;
+                return `${green("✓")} ${this.name}${this.duration()}${this.formatSource()}`;
             case "fail":
                 this.conclusionPrinted = true;
-                return `\x1b[31m✗\x1b[0m ${this.name}${this.duration()}${this.formatSource()}`;
+                return `${red("✗")} ${this.name}${this.duration()}${this.formatSource()}`;
         }
-    }
-
-    formatSource(): string {
-        if (this.sourcePrinted) return "";
-        this.sourcePrinted = true;
-        try {
-            const base = process.env.INIT_CWD;
-            return "\x1b[90m, at " + relative(base, this.source) + "\x1b[0m";
-        } catch {
-            return "\x1b[90m, at " + this.source + "\x1b[0m";
-        }
-    }
-
-    duration() {
-        const duration = Date.now() - this.startTime;
-        const milliseconds = duration % 1000;
-        const seconds = Math.floor(duration / 1000) % 60;
-        const minutes = Math.floor(duration / 60000);
-
-        let format = "";
-
-        if (duration >= 1000) {
-            if (milliseconds >= 0 && milliseconds <= 9) {
-                format = "00" + milliseconds.toString();
-            } else if (milliseconds >= 10 && milliseconds <= 99) {
-                format = "0" + milliseconds.toString();
-            } else {
-                format = milliseconds.toString();
-            }
-        } else {
-            format = milliseconds.toString() + "ms.";
-        }
-
-        if (duration >= 1000) {
-            if (duration >= 60000) {
-                if (seconds >= 0 && seconds <= 9) {
-                    format = "0" + seconds.toString() + "." + format;
-                } else {
-                    format = seconds.toString() + "." + format;
-                }
-            } else {
-                format = seconds.toString() + "." + format + "sec.";
-            }
-        }
-
-        if (duration >= 60000) {
-            format = minutes.toString() + ":" + format + "min.";
-        }
-
-        format = " (" + format + ")";
-
-        return format;
     }
 }
 
@@ -399,9 +361,9 @@ class TestSkip extends Scope implements TestState {
         this.sourcePrinted = true;
         try {
             const base = process.env.INIT_CWD;
-            return "\x1b[90m, at " + relative(base, this.source) + "\x1b[0m";
+            return gray(", at " + relative(base, this.source));
         } catch {
-            return "\x1b[90m, at " + this.source + "\x1b[0m";
+            return gray(", at " + this.source);
         }
     }
 }
