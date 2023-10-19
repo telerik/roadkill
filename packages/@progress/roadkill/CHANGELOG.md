@@ -3,6 +3,17 @@
 All notable changes to this project will be documented in this file.
 See [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## 0.2.1 (2023-10-19)
+
+
+### Bug Fixes
+
+* use different characters for test start and test skip and remove fullname from names ([#23](https://github.com/telerik/roadkill/issues/23)) ([97135bb](https://github.com/telerik/roadkill/commit/97135bbf4da30eaa48c15ccf56d045d18f5bc1b7))
+
+
+
+
+
 # 0.2.0 (2023-10-18)
 
 
