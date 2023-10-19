@@ -176,7 +176,7 @@ class FunctionScope extends Scope {
     constructor(parent: Scope, name: string, source: string, names: string[]) {
         super(parent, name);
         this.source = source;
-        this.names = [...names, name];
+        this.names = names;
     }
 
     override begin() {
@@ -213,7 +213,7 @@ class HookScope extends FunctionScope implements HookState {
     public get status() { return this._status; }
     public get error() { return this.error; }
     public get fullName() { return this.names.join(" "); }
-    public get hookName() { return this.names[this.names.length - 1]; }
+    public get hookName() { return this.name; }
 
     override begin(): void {
         super.begin();
@@ -252,7 +252,7 @@ class HookScope extends FunctionScope implements HookState {
     toString(): string {
         switch (this._status) {
             case "started":
-                return `${gray("○")} ${this.name}${this.formatSource()}`;
+                return `${gray("⛛")} ${this.name}${this.formatSource()}`;
             case "pass":
                 this.conclusionPrinted = true;
                 return `${green("✓")} ${this.name}${this.duration()}${this.formatSource()}`;
@@ -323,7 +323,7 @@ class TestScope extends FunctionScope implements TestState {
     toString(): string {
         switch (this._status) {
             case "started": 
-                return `${gray("○")} ${this.name}${ this.beginWithDotDotDot ? " ... " : ""}${this.formatSource()}`;
+                return `${gray("⛛")} ${this.name}${ this.beginWithDotDotDot ? " ... " : ""}${this.formatSource()}`;
             case "pass":
                 this.conclusionPrinted = true;
                 return `${green("✓")} ${this.name}${this.duration()}${this.formatSource()}`;
@@ -353,7 +353,7 @@ class TestSkip extends Scope implements TestState {
     public get testName() { return this.names[this.names.length - 1]; }
 
     toString() {
-        return `\x1b[90m◯\x1b[0m ${this.name}${this.formatSource()}`;
+        return `${gray("○")} ${this.name}${this.formatSource()}`;
     }
 
     formatSource(): string {
@@ -394,6 +394,8 @@ class TestEnvironment extends BaseEnvironment {
             nameStack.push(event.test.name);
         } else if (event?.describeBlock?.name && event?.describeBlock.name != "ROOT_DESCRIBE_BLOCK") {
             nameStack.push(event.describeBlock.name);
+        } else if (event?.hook?.type) {
+            nameStack.push(event?.hook?.type);
         }
 
         let parent = event?.test?.parent || event?.describeBlock?.parent || event?.hook?.parent;
