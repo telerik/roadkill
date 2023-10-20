@@ -76,4 +76,23 @@ describe("w3schools", () => {
         });
 
     }, 20000);
+
+    test("rogue steps", async () => {
+        await step("step 1.", async () => {
+            await step("step 1.1.", async () => {
+                await sleep(40000);
+            });
+        });
+        await step("step 2.", async () => {
+            await sleep(6000);
+        });
+        await step("step 3.", async () => {
+            await sleep(20000);
+        })
+    }, 10000);
+
+    test("next test", async () => {
+        await step("something slow", () =>
+            new Promise(resolve => setTimeout(resolve, 50000)));
+    }, 60000);
 });
