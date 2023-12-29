@@ -79,3 +79,75 @@ WebDriverMethodError: Failed to print page.
   }
 }
 ```
+
+### Pros and Cons
+#### TypeScript First
+> Today, 05 Oct 2023
+I am using TypeScript for code type checking and auto completions.
+I was trying to find how a certain `find` method works on a famous automation framework. I mouse over the `find` in:
+``` TypeScript
+    /**
+     * Locates a tab in the editor area by title containing the {@link title} string.
+     * Note the search does not do a complete match, but looks for a substring.
+     * @param title 
+     * @returns 
+     */
+    public async waitForTab(title: string): Promise<void> {
+        const tabLocator = By.css(`.tabs-and-actions-container .tab[aria-label*="${Escape.cssEscape(title)}"]`);
+        await this.find(tabLocator, 20000);
+    }
+```
+And then the VS Code IDE opens a private package in a `web-app.d.ts` file. I open the `web-app.js` by hand, go to `find()` only to see the transpiled TypeScript to JavaScript:
+```JavaScript
+ find(locator, timeout = 10000, pollTimeout = 25) {
+        return __awaiter(this, void 0, void 0, function* () {
+```
+Somewhere there is `yield this.driver.wait(***_webdriver_1.until.elementLocated(locator)`, ctrl + click again, sent to `node_modules/@types/<3rd-party>/<module.d.ts>`. Navigate by hand again back from `node_modules/@types/<3rd-party>` to `node_modules/<3rd-party>`.
+
+With a thin framework, like ***roadkill***, targeting TypeScript, ctrl + click will send you to .ts code. And without multiple layers of abstraction, you won't get lost in polymorphic calls.
+
+Imagine you could hold ***ctrl*** and point over your testing framework and see what exactly happens ***under-the-hood***:
+![](./images/pros-and-cons/typescript-by-default.png)
+
+#### Compile-Time Checking
+> Today, 05 Oct 2023
+
+A test of mine is flaky. The test fails, I capture a screenshot and attach that to the test artifacts.
+
+```
+ - Create Kendo UI for Angular Application › default theme
+
+    TimeoutError: Failed to find element located by By(xpath, //h3[text()="Kendo UI Template Wizard"]).
+
+    Wait timed out after 45021ms
+```
+
+Several other elements tests like this passed successfully. The screenshot shows the element visibly is there. And I am trying to find out why the `find()` method would fail.
+
+There is so much type checking boilerplate:
+
+``` JavaScript
+    if (typeof timeout !== 'number' || timeout < 0) {
+      throw TypeError('timeout must be a number >= 0: ' + timeout)
+    }
+```
+
+With TypeScript you just annotate `find(timeout: number)` and focus on the application logic.
+
+#### Get The Stack
+> Today, 14 Oct 2023
+
+I am getting a test fail report from one of my e2e:
+```
+StaleElementReferenceError: stale element reference: stale element not found
+      (Session info: chrome=114.0.5735.289)
+
+      at Object.throwDecodedError (node_modules/selenium-webdriver/lib/error.js:524:15)
+      at parseHttpResponse (node_modules/selenium-webdriver/lib/http.js:587:13)
+      at Executor.execute (node_modules/selenium-webdriver/lib/http.js:515:28)
+      at async Driver.execute (node_modules/selenium-webdriver/lib/webdriver.js:745:17)
+```
+
+What is wrong with it? None of the lines have anything to do with my code. This usually boils down to a "find + click" pair that execute in two separate requests to the WebDriver and in between dynamic UI had changed. If only the underlying framework wasn't using excessive amounts of abstractions.
+
+So where did it fail? No idea!
