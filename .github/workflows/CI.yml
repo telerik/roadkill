@@ -2,7 +2,7 @@ name: Continuous Integration
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   build:
@@ -11,17 +11,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: install virtual display
         run: sudo apt-get install xvfb
+
       - name: npm install
         run: npm ci
+
       - name: npm test
         run: xvfb-run --auto-servernum npm test
+
       - name: npm pack
         run: npm pack --ws
+
       - name: upload artefacts
         uses: actions/upload-artifact@v4
         with:
