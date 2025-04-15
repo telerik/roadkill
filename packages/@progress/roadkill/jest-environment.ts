@@ -229,8 +229,11 @@ class HookScope extends FunctionScope implements HookState {
     fail(error: Error = undefined) {
         this._status = "fail";
         this._error = error;
+    }
+
+    logError() {
         if (this._error) {
-            consoleModule.log(error);
+            consoleModule.log(this._error);
         }
     }
 
@@ -300,8 +303,11 @@ class TestScope extends FunctionScope implements TestState {
     fail(error: Error = undefined) {
         this._status = "fail";
         this._error = error;
+    }
+
+    logError() {
         if (this._error) {
-            consoleModule.log(error);
+            consoleModule.log(this._error);
         }
     }
 
@@ -380,7 +386,25 @@ const BaseEnvironment = (NodeEnvironment as any);
 class TestTimeout extends Error {}
 class HookTimeout extends Error {}
 
+class TestEvent extends Event {
+    public readonly test: TestState;
+    constructor(test: TestState, eventInitDict?: EventInit) {
+        super("test", eventInitDict);
+        this.test = test;
+    }
+}
+
+class HookEvent extends Event {
+    public readonly hook: HookState;
+    constructor(hook: HookState, eventInitDict?: EventInit) {
+        super("hook", eventInitDict);
+        this.hook = hook;
+    }
+}
+
 class TestEnvironment extends BaseEnvironment {
+
+    public testEvents = new EventTarget();
 
     constructor(config, context) {
         super(config, context);
@@ -472,6 +496,7 @@ class TestEnvironment extends BaseEnvironment {
 
         if (event.name == "setup" && this.global.roadkillJestConsoleDefault !== false) {
             this.global.console = consoleModule;
+            this.global["@progress/roadkill/utils:test-events"] = this.testEvents;
         }
 
         if (this.global.roadkillJestLifecycleLogging) {
@@ -494,41 +519,54 @@ class TestEnvironment extends BaseEnvironment {
                 new DescribeScope(Scope.top, nameStack.join(" > ")).begin();
             }
         } else if (event.name == "hook_start") {
-            const hookScope = new HookScope(
+            const hook = new HookScope(
                 Scope.top,
                 this.hookName(event),
                 this.source(event),
                 nameStack);
-            this.global["@progress/roadkill/utils:hook"] = hookScope;
-            hookScope.begin();
+            this.global["@progress/roadkill/utils:hook"] = hook;
+            hook.begin();
+            this.testEvents.dispatchEvent(new HookEvent(hook));
         } else if (event.name == "hook_success") {
-            (Scope.top as HookScope).pass();
+            const hook = (Scope.top as HookScope);
+            hook.pass();
+            this.testEvents.dispatchEvent(new HookEvent(hook));
             Scope.pop();
         } else if (event.name == "hook_failure") {
-            (Scope.top as HookScope).fail(event.error);
+            const hook = (Scope.top as HookScope);
+            hook.fail(event.error);
+            this.testEvents.dispatchEvent(new HookEvent(hook));
+            hook.logError();
             Scope.pop();
         } else if (event.name == "test_started") {
-            const testScope = new TestScope(
+            const test = new TestScope(
                 Scope.top,
                 nameStack.join(" > "),
                 this.source(event),
                 nameStack);
-            this.global["@progress/roadkill/utils:test"] = testScope;
-            testScope.begin();
+            this.global["@progress/roadkill/utils:test"] = test;
+            test.begin();
+            this.testEvents.dispatchEvent(new TestEvent(test));
+        } else if (event.name == "test_fn_start") {
         } else if (event.name == "test_fn_failure") {
             const test = Scope.top as TestScope;
             test.fail(event.error);
+            this.testEvents.dispatchEvent(new TestEvent(test));
+            test.logError();
         } else if (event.name == "test_fn_success") {
             const test = Scope.top as TestScope;
             test.pass();
+            this.testEvents.dispatchEvent(new TestEvent(test));
         } else if (event.name == "test_done") {
-            const test = (Scope.top as TestScope);
+            let test = (Scope.top as TestScope);
             if (test.status == "started") {
                 test.fail();
+                this.testEvents.dispatchEvent(new TestEvent(test));
+                test.logError();
             }
             Scope.pop();
         } else if (event.name == "test_skip") {
-            const testScope = new TestSkip(
+            const test = new TestSkip(
                 Scope.top,
                 nameStack.join(" > "),
                 this.source(event),

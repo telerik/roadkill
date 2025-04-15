@@ -98,9 +98,6 @@ export function getState(): State {
     };
 }
 
-class StepError extends Error {
-}
-
 /**
  * Formats duration given in milliseconds to user friendly string.
  * Tests run in seconds usually so for ranges:
@@ -183,16 +180,28 @@ class Step {
     private interval: NodeJS.Timeout;
     private level: number;
 
+    private detached: boolean = false;
+    private completed: boolean = false;
+    private groupEndPrinted: boolean = false;
+
     static push(name: string): Step {
         const step = new Step();
         step.name = name;
         step.level = Step.stack.length;
         step.parent = step.level ? Step.stack[step.level - 1] : undefined;
+        if (step.parent) step.parent.children.push(step);
         step.startTime = Date.now();
         step.timeout = setTimeout(() => step.onTimeout(), 5000);
         step.interval = setInterval(() => step.onInterval(), 10000);
         Step.stack.push(step);
         return step;
+    }
+
+    static detachSteps() {
+        this.flushSteps();
+        while(Step.stack.length) {
+            Step.stack.pop().detach();
+        }
     }
 
     static flushSteps(to: Step = undefined) {
@@ -219,10 +228,18 @@ class Step {
     }
 
     onInterval() {
-        if (this.beginPrinted && this == Step.stack[Step.stack.length - 1]) {
-            baseConsole.groupEnd();
-            baseConsole.group(`${gray("⋮")} ${this.name}${gray(` (so far ${formatDuration(Date.now() - this.startTime)})`)}`);
+        if (this.beginPrinted && this.hasNoRunningChildren) {
+            if (this.detached) {
+                baseConsole.log(`${red("⚠")} ${this.name}${gray(` (so far ${formatDuration(Date.now() - this.startTime)})`)}`)
+            } else {
+                baseConsole.groupEnd();
+                baseConsole.group(`${gray("⋮")} ${this.name}${gray(` (so far ${formatDuration(Date.now() - this.startTime)})`)}`);
+            }
         }
+    }
+
+    get hasNoRunningChildren(): boolean {
+        return this.children.reduce((result, current) => result && current.completed, true);
     }
 
     begin() {
@@ -232,9 +249,11 @@ class Step {
     }
 
     resolve() {
-        if (Step.stack.length == 0 || Step.stack[Step.stack.length - 1] != this)
-            throw new Error(`Error on step resolve '${this.name}', it is not last on the stack.`);
-        Step.stack.pop();
+        this.completed = true;
+        const index = Step.stack.indexOf(this);
+        if (index > -1) {
+            Step.stack.splice(index, 1);
+        }
         if (this.timeout) {
             clearTimeout(this.timeout);
             this.timeout = undefined;
@@ -243,15 +262,20 @@ class Step {
             clearInterval(this.interval);
             this.interval = undefined;
         }
-        if (this.beginPrinted) baseConsole.groupEnd();
-        if (this.parent) Step.flushSteps(this.parent);
+        if (this.beginPrinted && !this.groupEndPrinted) {
+            this.groupEndPrinted = true;
+            baseConsole.groupEnd();
+        }
+        if (!this.detached && this.parent) Step.flushSteps(this.parent);
         baseConsole.log(`${green("▪")} ${this.name}${gray(` (in ${formatDuration(Date.now() - this.startTime)})`)}`);
     }
 
     fail(cause: any) {
-        if (Step.stack.length == 0 || Step.stack[Step.stack.length - 1] != this)
-            throw new Error(`Error on step fail '${this.name}', it is not last on the stack.`);
-        Step.stack.pop();
+        this.completed = true;
+        const index = Step.stack.indexOf(this);
+        if (index > -1) {
+            Step.stack.splice(index, 1);
+        }
         if (this.timeout) {
             clearTimeout(this.timeout);
             this.timeout = undefined;
@@ -260,11 +284,49 @@ class Step {
             clearInterval(this.interval);
             this.interval = undefined;
         }
-        if (this.beginPrinted) baseConsole.groupEnd();
-        if (this.parent) Step.flushSteps(this.parent);
+        if (this.beginPrinted && !this.groupEndPrinted) {
+            this.groupEndPrinted = true;
+            baseConsole.groupEnd();
+        }
+        if (!this.detached && this.parent) Step.flushSteps(this.parent);
         baseConsole.log(`${red("✗")} ${this.name}${gray(` (in ${formatDuration(Date.now() - this.startTime)})`)}`);
     }
+
+    detach() {
+        this.detached = true;
+        if (this.beginPrinted && !this.groupEndPrinted) {
+            this.groupEndPrinted = true;
+            baseConsole.groupEnd();
+        }
+        if (!this.completed) {
+            baseConsole.log(`${red("⚠")} ${this.name} ...`);
+        }
+    }
 }
+
+interface TestEvent extends Event {
+    test: TestState;
+}
+
+interface HookEvent extends Event {
+    hook: HookState;
+}
+
+function handleTestEvent(event: TestEvent) {
+    if (event.test.status != "started") {
+        Step.detachSteps();
+    }
+}
+
+function handleHookEvent(event: HookEvent) {
+    if (event.hook.status != "started") {
+        Step.detachSteps();
+    }
+}
+
+global["@progress/roadkill/utils:test-events"]?.addEventListener("test", handleTestEvent);
+global["@progress/roadkill/utils:test-events"]?.addEventListener("hook", handleHookEvent);
+
 
 export async function step<T>(name: string, action: () => T | Promise<T>): Promise<T> {
     let result: T = undefined;
