@@ -71,7 +71,7 @@ export type Proxy = {
      * Lists the address for which the proxy should be bypassed when the proxyType is "manual".
      * A List containing any number of Strings.
      */
-    noProxy?: (number | string)[],
+    noProxy?: string[],
     /**
      * Defines the proxy host for encrypted TLS traffic when the proxyType is "manual".
      * A host and optional port for scheme "https".
@@ -308,7 +308,7 @@ export interface Cookie {
     secure?: boolean;
     httpOnly?: boolean;
     expiry?: number;
-    sameSite?: "Lax" | "Strict";
+    sameSite?: "Lax" | "Strict" | "None";
 }
 
 export type ElementLookup = CSSSelector | LinkText | PartialLinkText | TagName | XPathSelector;
@@ -416,7 +416,7 @@ export interface ActionSequencePointer {
     parameters?: {
         pointerType?: "mouse" | "pen" | "touch";
     };
-    actions: (Actions.Pause | Actions.PointerUp | Actions.PointerDown | Actions.PointerMove)[];
+    actions: (Actions.Pause | Actions.PointerUp | Actions.PointerDown | Actions.PointerMove | Actions.PointerCancel)[];
 }
 
 export interface ActionSequenceWheel {
@@ -472,6 +472,19 @@ export interface WebDriverClientOptions {
 /**
  * A [Local end](https://www.w3.org/TR/webdriver2/#nodes) node implementation of the WebDriver specification.
  */
+
+// Helpers for safe JSON (de)serialization
+function withReplacer(serializer?: Serializer) {
+    return typeof serializer?.serialize === "function"
+        ? (_k: string, v: any) => serializer!.serialize!(v)
+        : undefined;
+}
+function withReviver(serializer?: Serializer) {
+    return typeof serializer?.deserialize === "function"
+        ? (_k: string, v: any) => serializer!.deserialize!(v)
+        : undefined;
+}
+
 export class WebDriverClient {
 
     public useImplicitSignal = true;
@@ -515,22 +528,44 @@ export class WebDriverClient {
 
     public async request<Args, Result>(method: Method, uri: string, args?: Args, signal?: AbortSignal, serializer?: Serializer): Promise<Result> {
         try {
-            const requestInit: RequestInit = {};
-            requestInit.method = method;
+            const headers: Record<string, string> = { "Accept": "application/json" };
+            const requestInit: RequestInit = { method, headers };
             signal = withImplicitSignal(signal, this.useImplicitSignal);
             if (signal) requestInit.signal = signal;
-            if (args !== undefined) requestInit.body = JSON.stringify(args, serializer?.serialize && ((key, value) => serializer.serialize(value)))
+            if (args !== undefined) {
+                headers["Content-Type"] = "application/json; charset=utf-8";
+                requestInit.body = JSON.stringify(args, withReplacer(serializer));
+            }
             
-            this.log(`fetch: ${method} ${uri}${args !== undefined ? " " + requestInit.body.toString().substring(0, 40) : ""}`);
+            const bodyStr = typeof requestInit.body === "string" ? requestInit.body.slice(0, 40) : "";
+            this.log(`fetch: ${method} ${uri}${bodyStr ? " " + bodyStr : ""}`);
             const response = await this.fetchImplementation(`${this.options.address}${uri}`, requestInit);
 
-            this.log(`  response: ${method} ${response.status} ${response.statusText} ${uri}${args !== undefined ? " " + requestInit.body.toString().substring(0, 40) : ""}`);
+            this.log(`  response: ${method} ${response.status} ${response.statusText} ${uri}${bodyStr ? " " + bodyStr : ""}`);
+            let text = "";
+            try { text = await response.text(); } catch {}
+
             if (!response.ok) {
-                throw new WebDriverRequestError(await response.json() as ErrorResult);
+                if (text) {
+                    try {
+                        const errJson = JSON.parse(text);
+                        throw new WebDriverRequestError(errJson as ErrorResult);
+                    } catch {
+                        throw new WebDriverRequestError(`${response.status} ${response.statusText}`);
+                    }
+                }
+                throw new WebDriverRequestError(`${response.status} ${response.statusText}`);
             }
 
-            const text = await response.text()
-            const json = JSON.parse(text, serializer?.deserialize && ((key, value) => serializer.deserialize(value)));
+            if (!text) return undefined as unknown as Result;
+
+            let json: any;
+            try {
+                json = JSON.parse(text, withReviver(serializer));
+            } catch {
+                throw new WebDriverRequestError("Invalid JSON from WebDriver endpoint.");
+            }
+
             const result = (json as { value: Result }).value;
             return result;
         } catch(cause) {
@@ -611,7 +646,7 @@ export class Session implements Disposable, Serializer {
      */
     public async setTimeouts(timeouts: TimeoutsConfiguration, signal?: AbortSignal): Promise<void> {
         try {
-            return this.request("POST", `/session/${this.sessionId}/timeouts`, timeouts, signal);
+            return await this.request("POST", `/session/${this.sessionId}/timeouts`, timeouts, signal);
         } catch(cause) {
             throw new WebDriverMethodError(`Failed to set timeouts.`, { cause }, { timeouts });
         }
@@ -741,7 +776,7 @@ export class Session implements Disposable, Serializer {
             const res = await this.request<{ type: "tab" | "window" }, { handle: WindowHandle, type: "tab" | "window"}>("POST", `/session/${this.sessionId}/window/new`, { type }, signal);
             return new Window(this, res.handle, res.type);
         } catch(cause) {
-            throw new WebDriverMethodError(`Failed open a new window.`, { cause }, { type });
+            throw new WebDriverMethodError(`Failed to open a new window.`, { cause }, { type });
         }
     }
 
@@ -874,16 +909,16 @@ export class Session implements Disposable, Serializer {
      * 
      * The ***Get Page Source*** command returns a string serialization of the DOM of the current browsing context active document.
      */
-    public getPageSource(signal?: AbortSignal): Promise<string> {
+    public async getPageSource(signal?: AbortSignal): Promise<string> {
         try {
-            return this.request("GET", `/session/${this.sessionId}/source`, undefined, signal);
+            return await this.request("GET", `/session/${this.sessionId}/source`, undefined, signal);
         } catch(cause) {
             throw new WebDriverMethodError(`Failed to get page source.`, { cause });
         }
     }
 
     /**
-     * [13.2.1 Execute Scrip](https://www.w3.org/TR/webdriver2/#execute-script)
+     * [13.2.1 Execute Script](https://www.w3.org/TR/webdriver2/#execute-script)
      */
     public async executeScript(script: string, signal?: AbortSignal, ...args: any[]): Promise<any> {
         try {
@@ -896,9 +931,9 @@ export class Session implements Disposable, Serializer {
     /**
      * [13.2.2 Execute Async Script](https://www.w3.org/TR/webdriver2/#execute-async-script)
      */
-    public executeScriptAsync(script: string, signal?: AbortSignal, ...args: any[]): Promise<any> {
+    public async executeScriptAsync(script: string, signal?: AbortSignal, ...args: any[]): Promise<any> {
         try {
-            return this.request("POST", `/session/${this.sessionId}/execute/async`, { script, args }, signal);
+            return await this.request("POST", `/session/${this.sessionId}/execute/async`, { script, args }, signal);
         } catch(cause) {
             throw new WebDriverMethodError(`Failed to execute script async.`, { cause });
         }
@@ -1199,9 +1234,9 @@ export class Element implements WebElementReference {
     /**
      * [12.4.3 Get Element Property](https://www.w3.org/TR/webdriver2/#get-element-property)
      */
-    public async getProperty(name: string, signal?: AbortSignal): Promise<null | string> {
+    public async getProperty(name: string, signal?: AbortSignal): Promise<any> {
         try {
-            return await this.request<{}, null | string>("GET", `/session/${this.sessionId}/element/${this.elementId}/property/${name}`, undefined, signal);
+            return await this.request<{}, any>("GET", `/session/${this.sessionId}/element/${this.elementId}/property/${name}`, undefined, signal);
         } catch(cause) {
             throw new WebDriverMethodError(`Failed to get property ${name} from element.`, { cause }, { name });
         }   
@@ -1257,7 +1292,7 @@ export class Element implements WebElementReference {
         try {
             return await this.request<{}, ElementRect>("GET", `/session/${this.sessionId}/element/${this.elementId}/rect`, undefined, signal);
         } catch(cause) {
-            throw new WebDriverMethodError(`Failed to get tag name from element.`, { cause });
+            throw new WebDriverMethodError(`Failed to get rect from element.`, { cause });
         }
     }
 
