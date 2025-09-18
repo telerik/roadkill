@@ -29,7 +29,7 @@ describe("w3schools", () => {
         await driver?.quit();
     });
 
-    test.skip("navigate to js statements page", async () => {
+    test("navigate to js statements page", async () => {
         await driver.navigate().to('http://www.w3schools.com');
         await sleep(3000);
         await session.navigateTo('http://www.w3schools.com/js')
