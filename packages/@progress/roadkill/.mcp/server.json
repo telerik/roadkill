@@ -1,0 +1,21 @@
+{
+  "$schema": "https://modelcontextprotocol.io/schemas/draft/2025-07-09/server.json",
+  "name": "io.github.telerik/roadkill",
+  "description": "Roadkill MCP: WebDriver utilities exposed to LLMs over stdio.",
+  "packages": [
+    {
+      "registry_name": "npm",
+      "name": "@progress/roadkill",
+      "version": "0.2.4",
+      "package_arguments": [],
+      "environment_variables": []
+    }
+  ],
+  "version_detail": {
+    "version": "0.2.4"
+  },
+  "repository": {
+    "url": "https://github.com/telerik/roadkill",
+    "source": "github"
+  }
+}

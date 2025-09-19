@@ -16,6 +16,11 @@ export interface ServerOptions {
      * A console.log prefix.
      */
     logPrefix?: string;
+
+    /**
+     * A console.log implementation.
+     */
+    log?: (line: string) => void;
 }
 
 /**
@@ -128,7 +133,7 @@ export abstract class Server<Options extends ServerOptions> extends EventEmitter
     }
 
     protected log(line: string) {
-        if (this.options.enableLogging) console.log(`${this.prefix ? "[" + this.prefix + "] " : ""}${line}`);
+        if (this.options.enableLogging) (this.options.log ?? console.log)(`${this.prefix ? "[" + this.prefix + "] " : ""}${line}`);
     }
 
     private onStdOut(line: string) {

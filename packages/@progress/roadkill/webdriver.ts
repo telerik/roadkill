@@ -467,6 +467,7 @@ export interface WebDriverClientOptions {
     address: string;
     enableLogging?: boolean;
     logPrefix?: string;
+    log?: (line: string) => void;
 }
 
 /**
@@ -495,7 +496,7 @@ export class WebDriverClient {
     get prefix() { return this.options.logPrefix ?? "[WebDriverClient]" }
 
     protected log(line: string) {
-        if (this.options?.enableLogging) console.log(`${this.prefix ? this.prefix + " " : ""}${line}`);
+        if (this.options?.enableLogging) (this.options.log ?? console.log)(`${this.prefix ? this.prefix + " " : ""}${line}`);
     }
 
     /**
