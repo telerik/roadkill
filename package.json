@@ -3,7 +3,8 @@
     "workspaces": [
         "packages/@progress/roadkill",
         "examples/jest-web",
-        "examples/selenium-interop"
+        "examples/selenium-interop",
+        "examples/test-website"
     ],
     "engines": {
         "node": "^18.17.0",

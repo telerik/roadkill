@@ -4,7 +4,8 @@
     "packages": [
         "packages/@progress/roadkill",
         "examples/jest-web",
-        "examples/selenium-interop"
+        "examples/selenium-interop",
+        "examples/test-website"
     ],
     "command": {
         "bootstrap": {

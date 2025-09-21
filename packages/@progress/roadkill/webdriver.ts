@@ -16,7 +16,7 @@ export class WebDriverMethodError extends Error {
     constructor(error?: string, options?: ErrorOptions, args?: {}) {
         super(error, options);
         if (args)
-            for(const key in args)
+            for (const key in args)
                 this[key] = args[key];
     }
 }
@@ -29,7 +29,7 @@ export class WebDriverRequestError extends Error {
             if (error.value.stacktrace)
                 Object.defineProperty(this, "stacktrace", { value: error.value.stacktrace, enumerable: false });
             if (error.value.data)
-                this["data"] = error.value.data;            
+                this["data"] = error.value.data;
         }
     }
 }
@@ -493,7 +493,7 @@ export class WebDriverClient {
     public constructor(public readonly options: WebDriverClientOptions, public readonly fetchImplementation: typeof fetch = fetch) {
     }
 
-    get prefix() { return this.options.logPrefix ?? "[WebDriverClient]" }
+    get prefix() { return this.options.logPrefix ?? "[WebDriverClient]"; }
 
     protected log(line: string) {
         if (this.options?.enableLogging) (this.options.log ?? console.log)(`${this.prefix ? this.prefix + " " : ""}${line}`);
@@ -506,11 +506,11 @@ export class WebDriverClient {
     public async newSession(options: ProcessCapabilities | { capabilities: ValidateCapabilities }, signal?: AbortSignal): Promise<Session> {
         try {
             const result = await this.request<
-                    ProcessCapabilities | { capabilities: ValidateCapabilities },
-                    { capabilities: MatchingCapabilities, sessionId: string }
-                >("POST", "/session", options, signal);
+                ProcessCapabilities | { capabilities: ValidateCapabilities },
+                { capabilities: MatchingCapabilities, sessionId: string }
+            >("POST", "/session", options, signal);
             return new Session(this, result.sessionId, result.capabilities);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to create a new session.`, { cause }, { options });
         }
     }
@@ -522,7 +522,7 @@ export class WebDriverClient {
     public async status(signal?: AbortSignal): Promise<{ ready: boolean, message: string, [other: string]: any }> {
         try {
             return await this.request<{}, { ready: boolean, message: string }>("GET", "/status", undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError("Failed to retrieve status.", { cause });
         }
     }
@@ -537,14 +537,14 @@ export class WebDriverClient {
                 headers["Content-Type"] = "application/json; charset=utf-8";
                 requestInit.body = JSON.stringify(args, withReplacer(serializer));
             }
-            
+
             const bodyStr = typeof requestInit.body === "string" ? requestInit.body.slice(0, 40) : "";
             this.log(`fetch: ${method} ${uri}${bodyStr ? " " + bodyStr : ""}`);
             const response = await this.fetchImplementation(`${this.options.address}${uri}`, requestInit);
 
             this.log(`  response: ${method} ${response.status} ${response.statusText} ${uri}${bodyStr ? " " + bodyStr : ""}`);
             let text = "";
-            try { text = await response.text(); } catch {}
+            try { text = await response.text(); } catch { }
 
             if (!response.ok) {
                 if (text) {
@@ -569,7 +569,7 @@ export class WebDriverClient {
 
             const result = (json as { value: Result }).value;
             return result;
-        } catch(cause) {
+        } catch (cause) {
             const error = cause instanceof WebDriverRequestError ? cause : new WebDriverRequestError("WebDriver API call failed.", { cause });
             error["address"] = this.options.address;
             error["command"] = `${method} ${uri}`;
@@ -637,7 +637,7 @@ export class Session implements Disposable, Serializer {
     public async getTimeouts(signal?: AbortSignal): Promise<TimeoutsConfiguration> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/timeouts`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get timeouts."`, { cause });
         }
     }
@@ -648,21 +648,18 @@ export class Session implements Disposable, Serializer {
     public async setTimeouts(timeouts: TimeoutsConfiguration, signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/timeouts`, timeouts, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to set timeouts.`, { cause }, { timeouts });
         }
     }
 
     /**
      * [10.1 Navigate To](https://www.w3.org/TR/webdriver2/#navigate-to)
-     * 
-     * The command causes the user agent to navigate the current top-level browsing context to a new location.
-     * @param url 
      */
     public async navigateTo(url: string, signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/url`, { url }, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to navigate to ${url}.`, { cause }, { url });
         }
     }
@@ -673,86 +670,74 @@ export class Session implements Disposable, Serializer {
     public async getCurrentUrl(signal?: AbortSignal): Promise<string> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/url`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get current url.`, { cause });
         }
     }
 
     /**
      * [10.3 Back](https://www.w3.org/TR/webdriver2/#back)
-     * 
-     * This command causes the browser to traverse one step backward in the joint session history of the current top-level browsing context. This is equivalent to pressing the back button in the browser chrome or invoking window.history.back.
      */
     public async back(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/back`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/back`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to go back.`, { cause });
         }
     }
 
     /**
      * [10.4 Forward](https://www.w3.org/TR/webdriver2/#forward)
-     * 
-     * This command causes the browser to traverse one step forwards in the joint session history of the current top-level browsing context. This is equivalent to pressing the forward button in the browser chrome or invoking window.history.forward.
      */
     public async forward(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/forward`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/forward`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to go forward.`, { cause });
         }
     }
 
     /**
      * [10.5 Refresh](https://www.w3.org/TR/webdriver2/#refresh)
-     * 
-     * This command causes the browser to reload the page in the current top-level browsing context.
      */
     public async refresh(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/refresh`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/refresh`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to refresh.`, { cause });
         }
     }
 
     /**
      * [10.6 Get Title](https://www.w3.org/TR/webdriver2/#get-title)
-     * 
-     * This command returns the document title of the current top-level browsing context, equivalent to calling document.title.
      */
     public async getTitle(signal?: AbortSignal): Promise<string> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/title`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get title.`, { cause });
         }
     }
 
     /**
      * [11.1 Get Window Handle](https://www.w3.org/TR/webdriver2/#get-window-handle)
-     * 
-     * Return the window associated with the current top-level browsing context.
      */
     public async getWindow(signal?: AbortSignal): Promise<Window> {
         try {
             const handle = await this.request<{}, WindowHandle>("GET", `/session/${this.sessionId}/window`, undefined, signal);
             return new Window(this, handle);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get window.`, { cause });
         }
     }
 
     /**
      * [11.2 Close Window](https://www.w3.org/TR/webdriver2/#close-window)
-     * 
-     * Close the current top-level browsing context.
      */
     public async closeWindow(signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("DELETE", `/session/${this.sessionId}/window`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to close window.`, { cause });
         }
     }
@@ -764,7 +749,7 @@ export class Session implements Disposable, Serializer {
         try {
             const handles = await this.request<{}, WindowHandle[]>("GET", `/session/${this.sessionId}/window/handles`, undefined, signal);
             return handles.map(handle => new Window(this, handle));
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get windows.`, { cause });
         }
     }
@@ -774,100 +759,96 @@ export class Session implements Disposable, Serializer {
      */
     public async newWindow(type: "tab" | "window" = "tab", signal?: AbortSignal): Promise<Window> {
         try {
-            const res = await this.request<{ type: "tab" | "window" }, { handle: WindowHandle, type: "tab" | "window"}>("POST", `/session/${this.sessionId}/window/new`, { type }, signal);
+            const res = await this.request<{ type: "tab" | "window" }, { handle: WindowHandle, type: "tab" | "window" }>("POST", `/session/${this.sessionId}/window/new`, { type }, signal);
             return new Window(this, res.handle, res.type);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to open a new window.`, { cause }, { type });
         }
     }
 
     /**
-     * [11.6 Switch To Frame](11.6 Switch To Frame)
-     * 
-     * The Switch To Frame command is used to select the current top-level browsing context or a child browsing context of the current browsing context to use as the current browsing context for subsequent commands.
-     * 
-     * WebDriver is not bound by the same origin policy, so it is always possible to switch into child browsing contexts, even if they are different origin to the current browsing context.
+     * [11.6 Switch To Frame](https://www.w3.org/TR/webdriver2/#switch-to-frame)
      */
-    public async switchToFrame(frameId: null | number | ElementId = null, signal?: AbortSignal): Promise<void> {
+    public async switchToFrame(frame: null | number | Element | WebElementReference, signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/frame`, { id: frameId }, signal);
-        } catch(cause) {
-            throw new WebDriverMethodError(`Failed to switch to frame ${frameId}.`, { cause }, { frameId });
+            let id: null | number | WebElementReference;
+            if (frame === null || typeof frame === "number") {
+                id = frame;
+            } else if (frame instanceof Element) {
+                id = { [webElementIdentifier]: frame.elementId };
+            } else if (typeof frame === "object" && webElementIdentifier in frame) {
+                id = frame;
+            } else {
+                throw new Error("Invalid frame reference");
+            }
+            return await this.request("POST", `/session/${this.sessionId}/frame`, { id }, signal);
+        } catch (cause) {
+            throw new WebDriverMethodError(`Failed to switch to frame.`, { cause }, { frame });
         }
     }
 
     /**
      * [11.7 Switch To Parent Frame](https://www.w3.org/TR/webdriver2/#switch-to-parent-frame)
-     * 
-     * The Switch to Parent Frame command sets the current browsing context for future commands to the parent of the current browsing context.
      */
     public async switchToParentFrame(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/frame/parent`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/frame/parent`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to switch to parent frame.`, { cause });
         }
     }
 
     /**
      * [11.8.1 Get Window Rect](https://www.w3.org/TR/webdriver2/#get-window-rect)
-     * 
-     * The Get Window Rect command returns the size and position on the screen of the operating system window corresponding to the current top-level browsing context.
      */
     public async getWindowRect(signal?: AbortSignal): Promise<WindowRect> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/window/rect`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get window rect.`, { cause });
         }
     }
 
     /**
      * [11.8.2 Set Window Rect](https://www.w3.org/TR/webdriver2/#set-window-rect)
-     * 
-     * The Set Window Rect command alters the size and the position of the operating system window corresponding to the current top-level browsing context.
      */
     public async setWindowRect(windowRect: { x: null | number, y: null | number, width: null | number, height: null | number }, signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/window/rect`, windowRect, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to set window rect.`, { cause }, { windowRect });
         }
     }
 
     /**
      * [11.8.3 Maximize Window](https://www.w3.org/TR/webdriver2/#maximize-window)
-     * 
-     * The Maximize Window command invokes the window manager-specific “maximize” operation, if any, on the window containing the current top-level browsing context. This typically increases the window to the maximum available size without going full-screen.
      */
     public async maximize(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/window/maximize`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/window/maximize`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to maximize.`, { cause });
         }
     }
 
     /**
      * [11.8.4 Minimize Window](https://www.w3.org/TR/webdriver2/#minimize-window)
-     * 
-     * The Minimize Window command invokes the window manager-specific “minimize” operation, if any, on the window containing the current top-level browsing context. This typically hides the window in the system tray.
      */
     public async minimize(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/window/minimize`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/window/minimize`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to minimize.`, { cause });
         }
     }
-    
+
     /**
      * [11.8.5 Fullscreen Window](https://www.w3.org/TR/webdriver2/#fullscreen-window)
      */
     public async fullscreen(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/window/fullscreen`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/window/fullscreen`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to go fullscreen.`, { cause });
         }
     }
@@ -878,7 +859,7 @@ export class Session implements Disposable, Serializer {
     public async findElement(lookup: ElementLookup, signal?: AbortSignal): Promise<Element> {
         try {
             return await this.request<ElementLookup, Element>("POST", `/session/${this.sessionId}/element`, lookup, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to find element by ${lookup.using} "${lookup.value}".`, { cause }, { lookup });
         }
     }
@@ -889,7 +870,7 @@ export class Session implements Disposable, Serializer {
     public async findElements(lookup: ElementLookup, signal?: AbortSignal): Promise<Element[]> {
         try {
             return await this.request<ElementLookup, Element[]>("POST", `/session/${this.sessionId}/elements`, lookup, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to find elements by ${lookup.using} "${lookup.value}".`, { cause }, { lookup });
         }
     }
@@ -900,20 +881,18 @@ export class Session implements Disposable, Serializer {
     public async getActiveElement(signal?: AbortSignal): Promise<Element> {
         try {
             return await this.element(await this.request<{}, WebElementReference>("GET", `/session/${this.sessionId}/element/active`, undefined, signal));
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get active element.`, { cause });
         }
     }
 
     /**
      * [13.1 Get Page Source](https://www.w3.org/TR/webdriver2/#get-page-source)
-     * 
-     * The ***Get Page Source*** command returns a string serialization of the DOM of the current browsing context active document.
      */
     public async getPageSource(signal?: AbortSignal): Promise<string> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/source`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get page source.`, { cause });
         }
     }
@@ -924,7 +903,7 @@ export class Session implements Disposable, Serializer {
     public async executeScript(script: string, signal?: AbortSignal, ...args: any[]): Promise<any> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/execute/sync`, { script, args }, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to execute script.`, { cause });
         }
     }
@@ -935,7 +914,7 @@ export class Session implements Disposable, Serializer {
     public async executeScriptAsync(script: string, signal?: AbortSignal, ...args: any[]): Promise<any> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/execute/async`, { script, args }, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to execute script async.`, { cause });
         }
     }
@@ -946,9 +925,9 @@ export class Session implements Disposable, Serializer {
     public async getCookies(signal?: AbortSignal): Promise<Cookie[]> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/cookie`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get cookies.`, { cause });
-        }   
+        }
     }
 
     /**
@@ -957,7 +936,7 @@ export class Session implements Disposable, Serializer {
     public async getNamedCookie(name: string, signal?: AbortSignal): Promise<Cookie> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/cookie/${name}`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get named cookie '${name}'.`, { cause }, { name });
         }
     }
@@ -968,7 +947,7 @@ export class Session implements Disposable, Serializer {
     public async addCookie(cookie: Cookie, signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/cookie`, { cookie }, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to add cookie '${cookie.name}'.`, { cause }, { cookie });
         }
     }
@@ -979,7 +958,7 @@ export class Session implements Disposable, Serializer {
     public async deleteCookie(name: string, signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("DELETE", `/session/${this.sessionId}/cookie/${name}`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to delete cookie '${name}'.`, { cause }, { name });
         }
     }
@@ -990,7 +969,7 @@ export class Session implements Disposable, Serializer {
     public async deleteAllCookies(signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("DELETE", `/session/${this.sessionId}/cookie`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to delete all cookies.`, { cause });
         }
     }
@@ -1001,20 +980,18 @@ export class Session implements Disposable, Serializer {
     public async performActions(actions: ActionSequence[], signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/actions`, { actions }, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to perform actions.`, { cause });
         }
     }
 
     /**
      * [15.8 Release Actions](https://www.w3.org/TR/webdriver2/#release-actions)
-     *
-     * The Release Actions command is used to release all the keys and pointer buttons that are currently depressed. This causes events to be fired as if the state was released by an explicit series of actions. It also clears all the internal state of the virtual devices.
      */
     public async releaseActions(signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("DELETE", `/session/${this.sessionId}/actions`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to release actions.`, { cause });
         }
     }
@@ -1024,8 +1001,8 @@ export class Session implements Disposable, Serializer {
      */
     public async dismissAlert(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/alert/dismiss`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/alert/dismiss`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to dismiss alert.`, { cause });
         }
     }
@@ -1035,8 +1012,8 @@ export class Session implements Disposable, Serializer {
      */
     public async acceptAlert(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/alert/accept`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/alert/accept`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to accept alert.`, { cause });
         }
     }
@@ -1047,20 +1024,18 @@ export class Session implements Disposable, Serializer {
     public async getAlertText(signal?: AbortSignal): Promise<string> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/alert/text`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get alert.`, { cause });
         }
     }
 
     /**
      * [16.4 Send Alert Text](https://www.w3.org/TR/webdriver2/#send-alert-text)
-     * 
-     * The Send Alert Text command sets the text field of a window.prompt user prompt to the given value.
      */
     public async sendAlertText(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/alert/text`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/alert/text`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to send alert text.`, { cause });
         }
     }
@@ -1071,7 +1046,7 @@ export class Session implements Disposable, Serializer {
     public async takeScreenshot(signal?: AbortSignal): Promise<Base64PNG> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/screenshot`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to take screenshot.`, { cause });
         }
     }
@@ -1082,7 +1057,7 @@ export class Session implements Disposable, Serializer {
     public async printPage(printOptions?: PrintOptions, signal?: AbortSignal): Promise<string> {
         try {
             return await this.request<PrintOptions, string>("POST", `/session/${this.sessionId}/print`, printOptions ?? {}, signal)
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError("Failed to print page.", { cause }, printOptions && { printOptions });
         }
     }
@@ -1090,14 +1065,14 @@ export class Session implements Disposable, Serializer {
     /**
      * Deserialize an {@link Element} by {@link WebElementReference} within this session.
      */
-    public element(elementRef: WebElementReference, signal?: AbortSignal): Element {
+    public element(elementRef: WebElementReference, _signal?: AbortSignal): Element {
         return new Element(this, elementRef[webElementIdentifier]);
     }
 
     /**
      * Deserialize a {@link ShadowRoot} by {@link ShadowRootReference} within this session.
      */
-    public shadowRoot(shadowRootRef: ShadowRootReference, signal?: AbortSignal): ShadowRoot {
+    public shadowRoot(shadowRootRef: ShadowRootReference, _signal?: AbortSignal): ShadowRoot {
         return new ShadowRoot(this, shadowRootRef[shadowRootIdentifier]);
     }
 }
@@ -1117,16 +1092,14 @@ export class Window {
     public get sessionId() {
         return this.session.sessionId;
     }
-    
+
     /**
      * [11.3 Switch To Window](https://www.w3.org/TR/webdriver2/#switch-to-window)
-     * 
-     * Switching window will select the current top-level browsing context used as the target for all subsequent commands. In a tabbed browser, this will typically make the tab containing the browsing context the selected tab.
      */
     public async switchToWindow(signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/window`, { handle: this.handle }, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to switch to window ${this.handle}.`, { cause });
         }
     }
@@ -1164,12 +1137,13 @@ export class Element implements WebElementReference {
     }
 
     /**
-     * [11.6 Switch To Frame](https://www.w3.org/TR/webdriver2/#switch-to-frame)
+     * Switch to this element’s frame
      */
     public async switchToFrame(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/frame`, { id: this.elementId }, signal);
-        } catch(cause) {
+            const id: WebElementReference = { [webElementIdentifier]: this.elementId };
+            return await this.request("POST", `/session/${this.sessionId}/frame`, { id }, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to switch to frame from element.`, { cause });
         }
     }
@@ -1180,7 +1154,7 @@ export class Element implements WebElementReference {
     public async findElement(lookup: ElementLookup, signal?: AbortSignal): Promise<Element> {
         try {
             return await this.request<ElementLookup, Element>("POST", `/session/${this.sessionId}/element/${this.elementId}/element`, lookup, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to find element by ${lookup.using} "${lookup.value}" from element.`, { cause }, { lookup });
         }
     }
@@ -1191,7 +1165,7 @@ export class Element implements WebElementReference {
     public async findElements(lookup: ElementLookup, signal?: AbortSignal): Promise<Element[]> {
         try {
             return await this.request<ElementLookup, Element[]>("POST", `/session/${this.sessionId}/element/${this.elementId}/elements`, lookup, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to find elements by ${lookup.using} "${lookup.value}" from element.`, { cause }, { lookup });
         }
     }
@@ -1202,7 +1176,7 @@ export class Element implements WebElementReference {
     public async shadowRoot(signal?: AbortSignal): Promise<ShadowRoot> {
         try {
             return await this.request<{}, ShadowRoot>("GET", `/session/${this.sessionId}/element/${this.elementId}/shadow`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get shadowRoot from element.`, { cause });
         }
     }
@@ -1213,24 +1187,21 @@ export class Element implements WebElementReference {
     public async isSelected(signal?: AbortSignal): Promise<boolean> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/element/${this.elementId}/selected`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get isSelected from element.`, { cause });
         }
     }
 
     /**
      * [12.4.2 Get Element Attribute](https://www.w3.org/TR/webdriver2/#get-element-attribute)
-     * 
-     * Please note that the behavior of this command deviates from the behavior of getAttribute() in [DOM], which in the case of a set boolean attribute would return an empty string. The reason this command returns true as a string is because this evaluates to true in most dynamically typed programming languages, but still preserves the expected type information.
      */
     public async getAttribute(name: string, signal?: AbortSignal): Promise<null | string> {
         try {
             return await this.request<{}, null | string>("GET", `/session/${this.sessionId}/element/${this.elementId}/attribute/${name}`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get attribute ${name} from element.`, { cause }, { name });
         }
     }
-
 
     /**
      * [12.4.3 Get Element Property](https://www.w3.org/TR/webdriver2/#get-element-property)
@@ -1238,20 +1209,18 @@ export class Element implements WebElementReference {
     public async getProperty(name: string, signal?: AbortSignal): Promise<any> {
         try {
             return await this.request<{}, any>("GET", `/session/${this.sessionId}/element/${this.elementId}/property/${name}`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get property ${name} from element.`, { cause }, { name });
-        }   
+        }
     }
 
     /**
      * [12.4.4 Get Element CSS Value](https://www.w3.org/TR/webdriver2/#get-element-css-value)
-     * 
-     * The Get Element Text command intends to return an element’s text “as rendered”. An element’s rendered text is also used for locating a elements by their link text and partial link text.
      */
     public async getCSSValue(name: string, signal?: AbortSignal): Promise<string> {
         try {
             return await this.request<{}, string>("GET", `/session/${this.sessionId}/element/${this.elementId}/css/${name}`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get css value ${name} from element.`, { cause }, { name });
         }
     }
@@ -1262,7 +1231,7 @@ export class Element implements WebElementReference {
     public async getText(signal?: AbortSignal): Promise<string> {
         try {
             return await this.request<{}, string>("GET", `/session/${this.sessionId}/element/${this.elementId}/text`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get text from element.`, { cause });
         }
     }
@@ -1273,26 +1242,18 @@ export class Element implements WebElementReference {
     public async getTagName(signal?: AbortSignal): Promise<string> {
         try {
             return await this.request<{}, string>("GET", `/session/${this.sessionId}/element/${this.elementId}/name`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get tag name from element.`, { cause });
         }
     }
 
     /**
-     * The Get Element Rect command returns the dimensions and coordinates of the given web element. The returned value is a dictionary with the following members:
-     *  - {@link ElementRect.x}  
-     *   X axis position of the top-left corner of the web element relative to the current browsing context’s document element in CSS pixels.
-     *  - {@link ElementRect.y}  
-     *   Y axis position of the top-left corner of the web element relative to the current browsing context’s document element in CSS pixels.
-     *  - {@link ElementRect.height}  
-     *   Height of the web element’s bounding rectangle in CSS pixels.
-     *  - {@link ElementRect.width}  
-     *   Width of the web element’s bounding rectangle in CSS pixels.
+     * The Get Element Rect command returns the dimensions and coordinates of the given web element.
      */
     public async getRect(signal?: AbortSignal): Promise<ElementRect> {
         try {
             return await this.request<{}, ElementRect>("GET", `/session/${this.sessionId}/element/${this.elementId}/rect`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get rect from element.`, { cause });
         }
     }
@@ -1303,7 +1264,7 @@ export class Element implements WebElementReference {
     public async isEnabled(signal?: AbortSignal): Promise<boolean> {
         try {
             return await this.request<{}, boolean>("GET", `/session/${this.sessionId}/element/${this.elementId}/enabled`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get isEnabled from element.`, { cause });
         }
     }
@@ -1314,7 +1275,7 @@ export class Element implements WebElementReference {
     public async getComputedRole(signal?: AbortSignal): Promise<string> {
         try {
             return await this.request<{}, string>("GET", `/session/${this.sessionId}/element/${this.elementId}/computedrole`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get computed role from element.`, { cause });
         }
     }
@@ -1325,22 +1286,18 @@ export class Element implements WebElementReference {
     public async getComputedLabel(signal?: AbortSignal): Promise<string> {
         try {
             return await this.request<{}, string>("GET", `/session/${this.sessionId}/element/${this.elementId}/computedlabel`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to get computed label from element.`, { cause });
         }
     }
 
     /**
      * [12.5.1 Element Click](https://www.w3.org/TR/webdriver2/#element-click)
-     * 
-     * The Element Click command scrolls into view the element if it is not already pointer-interactable, and clicks its in-view center point.
-     * 
-     * If the element’s center point is obscured by another element, an element click intercepted error is returned. If the element is outside the viewport, an element not interactable error is returned.
      */
     public async click(signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/element/${this.elementId}/click`, {}, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to click element.`, { cause });
         }
     }
@@ -1350,8 +1307,8 @@ export class Element implements WebElementReference {
      */
     public async clear(signal?: AbortSignal): Promise<void> {
         try {
-            return await this.request("POST", `/session/${this.sessionId}/element/${this.elementId}/clear`, undefined, signal);
-        } catch(cause) {
+            return await this.request("POST", `/session/${this.sessionId}/element/${this.elementId}/clear`, {}, signal);
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to clear element.`, { cause });
         }
     }
@@ -1362,7 +1319,7 @@ export class Element implements WebElementReference {
     public async sendKeys(text: string, signal?: AbortSignal): Promise<void> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/element/${this.elementId}/value`, { text }, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to send text to element.`, { cause }, {
                 text: text?.length > 50 ? text?.substring(0, 50) + "..." : text
             });
@@ -1375,7 +1332,7 @@ export class Element implements WebElementReference {
     public async takeScreenshot(signal?: AbortSignal): Promise<Base64PNG> {
         try {
             return await this.request("GET", `/session/${this.sessionId}/element/${this.elementId}/screenshot`, undefined, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to take a screenshot of element.`, { cause });
         }
     }
@@ -1408,7 +1365,7 @@ export class ShadowRoot implements ShadowRootReference {
     public async findElement(lookup: ElementLookup, signal?: AbortSignal): Promise<Element> {
         try {
             return await this.request<ElementLookup, Element>("POST", `/session/${this.sessionId}/shadow/${this.shadowId}/element`, lookup, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to find element by ${lookup.using} "${lookup.value}" from shadow root.`, { cause }, { lookup });
         }
     }
@@ -1419,7 +1376,7 @@ export class ShadowRoot implements ShadowRootReference {
     public async findElements(lookup: ElementLookup, signal?: AbortSignal): Promise<Element[]> {
         try {
             return await this.request<ElementLookup, Element[]>("POST", `/session/${this.sessionId}/shadow/${this.shadowId}/elements`, lookup, signal);
-        } catch(cause) {
+        } catch (cause) {
             throw new WebDriverMethodError(`Failed to find elements by ${lookup.using} "${lookup.value}" from shadow root.`, { cause }, { lookup });
         }
     }

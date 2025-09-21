@@ -1,0 +1,31 @@
+{
+  "name": "test-website",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types --no-warnings index.ts",
+    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --detectOpenHandles --forceExit --no-warnings",
+    "prepare": "tsc -p ."
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.6",
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^4.17.23",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3",
+    "@jest/globals": "^29.7.0",
+    "@progress/roadkill": "^0.2.4",
+    "@types/jest": "^29.5.5",
+    "@types/node": "^20.8.2",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1"
+  },
+  "jest": {
+    "preset": "ts-jest/presets/default-esm",
+    "testEnvironment": "@progress/roadkill/jest-environment.ts"
+  }
+}
