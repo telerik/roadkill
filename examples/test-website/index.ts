@@ -102,29 +102,31 @@ function getCookie(req: Request, name: string) {
 app.get("/", (req: Request, res: Response) => {
   const gdprAccepted = getCookie(req, "gdprAccepted") === "true";
   const body = `
-<div class="container">
-  <div class="card content ${gdprAccepted ? "" : "inert"}">
-    <h1>Roadkill – Test Login</h1>
-    <p class="muted">Localhost-only demo for WebDriver QA. Use <strong>admin / 1234</strong>.</p>
-    <div class="spacer"></div>
-
-    <form class="stack" id="login-form">
-      <label>Username</label>
-      <input id="username" class="input" name="username" autocomplete="username" placeholder="admin" value="admin">
-      <label>Password</label>
-      <input id="password" class="input" name="password" type="password" autocomplete="current-password" placeholder="1234" value="1234">
-      <div class="hint muted">Submitting simulates a short random delay (500–1500ms) then navigates to Topics.</div>
+<main class="page-login">
+  <div class="container">
+    <div class="card content ${gdprAccepted ? "" : "inert"}">
+      <h1>Roadkill – Test Login</h1>
+      <p class="muted">Localhost-only demo for WebDriver QA. Use <strong>admin / 1234</strong>.</p>
       <div class="spacer"></div>
-      <button class="btn" type="submit">Sign in</button>
-    </form>
-  </div>
-</div>
 
-<div id="overlay" class="overlay ${gdprAccepted ? "hidden" : ""}">
-  <!-- IMPORTANT: allow-same-origin so CSP 'self' works inside iframe -->
-  <iframe class="overlay-frame" title="GDPR" src="/gdpr"
-          sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
-</div>
+      <form class="stack" id="login-form">
+        <label>Username</label>
+        <input id="username" class="input" name="username" autocomplete="username" placeholder="admin" value="admin">
+        <label>Password</label>
+        <input id="password" class="input" name="password" type="password" autocomplete="current-password" placeholder="1234" value="1234">
+        <div class="hint muted">Submitting simulates a short random delay (500–1500ms) then navigates to Topics.</div>
+        <div class="spacer"></div>
+        <button class="btn" type="submit">Sign in</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="overlay" class="overlay ${gdprAccepted ? "hidden" : ""}">
+    <!-- IMPORTANT: allow-same-origin so CSP 'self' works inside iframe -->
+    <iframe class="overlay-frame" title="GDPR" src="/gdpr"
+            sandbox="allow-scripts allow-forms allow-same-origin"></iframe>
+  </div>
+</main>
 
 <script>
 (function(){
@@ -171,21 +173,23 @@ app.get("/", (req: Request, res: Response) => {
 // GDPR iframe content (light UI, inline errors)
 app.get("/gdpr", (_req: Request, res: Response) => {
   const body = `
-<div class="container">
-  <div class="card">
-    <h2>GDPR Consent</h2>
-    <p class="muted">
-      This demo stores a single cookie <code>gdprAccepted</code> to enable the login form.
-      No other data is collected.
-    </p>
-    <div class="spacer"></div>
-    <div class="stack">
-      <button class="btn" id="accept">Accept</button>
-      <button class="btn secondary" id="decline">Decline</button>
-      <p class="error" id="error"></p>
+<main class="page-gdpr">
+  <div class="container">
+    <div class="card">
+      <h2>GDPR Consent</h2>
+      <p class="muted">
+        This demo stores a single cookie <code>gdprAccepted</code> to enable the login form.
+        No other data is collected.
+      </p>
+      <div class="spacer"></div>
+      <div class="stack">
+        <button class="btn" id="accept">Accept</button>
+        <button class="btn secondary" id="decline">Decline</button>
+        <p class="error" id="error"></p>
+      </div>
     </div>
   </div>
-</div>
+</main>
 <script>
   const accept = document.getElementById("accept");
   const decline = document.getElementById("decline");
@@ -253,16 +257,18 @@ app.get("/toc", (_req: Request, res: Response) => {
   `).join("");
 
   const body = `
-<div class="container">
-  <div class="card">
-    <h1>Roadkill – Topics</h1>
-    <p class="muted">Targetable summary cards for QA flows.</p>
+<main class="page-topics">
+  <div class="container">
+    <div class="card">
+      <h1>Roadkill – Topics</h1>
+      <p class="muted">Targetable summary cards for QA flows.</p>
+    </div>
+    <div class="spacer"></div>
+    <div id="topics-grid" class="row">${cards}</div>
+    <div class="spacer"></div>
+    <p class="center"><a href="/">⬅ Back to Login</a></p>
   </div>
-  <div class="spacer"></div>
-  <div id="topics-grid" class="row">${cards}</div>
-  <div class="spacer"></div>
-  <p class="center"><a href="/">⬅ Back to Login</a></p>
-</div>
+</main>
 `;
   res.type("html").send(html("Roadkill – Topics", body));
 });
