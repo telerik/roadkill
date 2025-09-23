@@ -1,4 +1,3 @@
-// semantic.ts
 import { Session, type Element as WebDriverElement } from "@progress/roadkill/webdriver.js";
 
 type FinderSrc = { name: string; src: string };
@@ -31,73 +30,62 @@ export function getFinders(): FinderSrc[] { return registry.payload(); }
 
 /** Base class: exposes hydrated WebDriver element and children. */
 export class SemanticObject {
-    readonly children: SemanticObject[] = [];
-    readonly element: WebDriverElement | null;
-    constructor(
-        protected readonly session: Session,
-        protected readonly dto: AnnotatedDTO<any>
-    ) {
-        this.element = (dto && "element" in dto ? (dto as any).element : null) ?? null;
-    }
+    public readonly children: SemanticObject[] = [];
+    public element?: WebDriverElement | null;
+    constructor(public readonly session?: Session) { }
+
     childrenOfType<T extends SemanticObject>(ctor: new (...args: any[]) => T): T[] {
         return this.children.filter(c => c instanceof ctor) as T[];
     }
-    toJSON(): any {
-        const cls = (this as any).constructor.name;
-        const { element, children, ["$semantic-class"]: _skip, ...props } = (this as any).dto || {};
-        // keep only primitive/array-of-primitives (like your prune logic)
-        const clean: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(props)) {
-            if (v == null) { clean[k] = v; continue; }
+
+    // serialization reads from instance props
+
+    private static pickSerializableProps(node: SemanticObject): Record<string, unknown> {
+        const out: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(node as any)) {
+            if (k === "children" || k === "element" || k === "session") continue;
+            if (v == null) { out[k] = v; continue; }
             const t = typeof v;
-            if (t === "string" || t === "number" || t === "boolean") { clean[k] = v; continue; }
+            if (t === "string" || t === "number" || t === "boolean") { out[k] = v; continue; }
             if (Array.isArray(v) && v.every(x => x == null || ["string", "number", "boolean"].includes(typeof x))) {
-                clean[k] = v; continue;
+                out[k] = v; continue;
             }
         }
+        return out;
+    }
+
+    toJSON(): any {
+        const cls = (this as any).constructor.name;
+        const clean = SemanticObject.pickSerializableProps(this);
         return [cls, clean, ...this.children.map(c => c.toJSON())];
     }
+
     toXML(indent: undefined | string = undefined): string {
-        const pretty: boolean = indent != undefined;
+        const pretty = indent != undefined;
+        const esc = (s: string) =>
+            s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
-        function esc(s: string) {
-            return s
-                .replace(/&/g, "&amp;")
-                .replace(/</g, "&lt;")
-                .replace(/>/g, "&gt;")
-                .replace(/"/g, "&quot;")
-                .replace(/'/g, "&apos;");
-        }
-
-        // exclude `$semantic-class`, and any non-primitive/object-ish values
-        function attrs(props: Record<string, unknown>): string {
-            return Object.entries(props || {})
+        const attrs = (props: Record<string, unknown>): string =>
+            Object.entries(props || {})
                 .filter(([k, v]) =>
-                    k !== "$semantic-class" &&                     // 🔒 don't print
-                    k !== "element" &&                             // element is object-y
-                    k !== "children" &&                            // children is object-y
-                    v !== null && v !== undefined &&
-                    (typeof v !== "object")
-                )
+                    k !== "element" && k !== "children" &&
+                    v !== null && v !== undefined && (typeof v !== "object"))
                 .map(([k, v]) => ` ${k}="${esc(String(v))}"`)
                 .join("");
-        }
 
-        if (!pretty) {
-            const cls = (this as any).constructor.name;
-            const { element, children, ...rest } = (this as any).dto || {};
-            const a = attrs(rest);
-            if (this.children.length === 0) return `<${cls}${a}/>`;
-            return `<${cls}${a}>${this.children.map(c => (c as any).toXML(undefined)).join("")}</${cls}>`;
-        }
-
-        // Pretty-printed recursive formatter
         const xmlOf = (node: SemanticObject, level: number): string => {
             const cls = (node as any).constructor.name;
-            const { element, children, ...rest } = (node as any).dto || {};
+            const rest = SemanticObject.pickSerializableProps(node);
             const a = attrs(rest);
+            const kids = node.children ?? [];
+
+            if (!pretty) {
+                if (kids.length === 0) return `<${cls}${a}/>`;
+                return `<${cls}${a}>${kids.map(c => (c as any).toXML(undefined)).join("")}</${cls}>`;
+            }
+
             const pad = (indent as string).repeat(level);
-            const kids = node.children || [];
             if (kids.length === 0) return `${pad}<${cls}${a}/>`;
             const open = `${pad}<${cls}${a}>`;
             const inner = kids.map(c => xmlOf(c, level + 1)).join("\n");
@@ -109,27 +97,10 @@ export class SemanticObject {
     }
 }
 
-function pruneJsonProps(props: Record<string, unknown>) {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(props)) {
-        if (v == null) { out[k] = v; continue; }
-        const t = typeof v;
-        if (t === "string" || t === "number" || t === "boolean") { out[k] = v; continue; }
-        if (Array.isArray(v) && v.every(x => x == null || ["string", "number", "boolean"].includes(typeof x))) {
-            out[k] = v; continue;
-        }
-    }
-    return out;
-}
-
-export class Root extends SemanticObject {
-    constructor(session: Session) {
-        super(session, { "$semantic-class": "Root" } as AnnotatedDTO<{}>);
-    }
-}
+export class Root extends SemanticObject { }
 
 export interface SemanticCtor<T extends SemanticObject> {
-    new(session: Session, dto: AnnotatedDTO<any>): T;
+    new(session: Session): T;
     semanticClass: string;
     find(): Array<{ element: globalThis.Element;[k: string]: any }>;
 }
@@ -152,36 +123,25 @@ export type AnnotatedDTO<T> = HydrateElements<T> & {
 export type DTOOf<C extends { find: (...args: any[]) => any }> =
     AnnotatedDTO<ElementOf<ReturnType<C["find"]>>>;
 
-/** ---------- Browser runner (extracted so we can build/log scripts) ---------- */
+/** ---------- Browser runner (stringified) ---------- */
 function browserRunner(list: Array<{ name: string; src: string }>) {
-    // Browser helper (unchanged)
     function findElementsByCss(selector: string, mapFn: (el: Element) => any) {
         const out: any[] = [];
         for (const el of document.querySelectorAll(selector)) {
             const r = mapFn(el);
             if (!r) continue;
             if (typeof r !== "object") continue;
-            (r as any).element = el; // always assign/overwrite anchor
+            (r as any).element = el;
             out.push(r);
         }
         return out;
     }
 
-    // 🔧 NEW: compile method-string safely
     function compileFinder(src: string): Function {
         let e1: any, e2: any, e3: any;
-        try {
-            // function foo(){}  OR  (args)=>{}  OR  async (args)=>{}
-            return (0, eval)(`(${src})`);
-        } catch (err) { e1 = err; }
-        try {
-            // turns "find(){}" into "function find(){}"
-            return (0, eval)(`(function ${src})`);
-        } catch (err) { e2 = err; }
-        try {
-            // turns "find(){}" into object method: ({ find(){} }).find
-            return (0, eval)(`({ ${src} }).find`);
-        } catch (err) {
+        try { return (0, eval)(`(${src})`); } catch (err) { e1 = err; }
+        try { return (0, eval)(`(function ${src})`); } catch (err) { e2 = err; }
+        try { return (0, eval)(`({ ${src} }).find`); } catch (err) {
             e3 = err;
             throw new Error(
                 `Failed to compile static find():\n- as expression: ${e1?.message || e1}\n- with 'function' prefix: ${e2?.message || e2}\n- as object method: ${e3?.message || e3}\nSource:\n${src}`
@@ -192,10 +152,8 @@ function browserRunner(list: Array<{ name: string; src: string }>) {
     const flat: any[] = [];
     for (const { name, src } of list) {
         const f = compileFinder(src);
-        let arr: any[];
-        try {
-            arr = f() || [];
-        } catch (err: any) {
+        let arr: any[] = [];
+        try { arr = f() || []; } catch (err: any) {
             throw new Error(`Finder "${name}" threw: ${err?.message || err}\nSource:\n${src}`);
         }
         for (const dto of arr) flat.push({ ["$semantic-class"]: name, ...dto, children: [] });
@@ -222,7 +180,6 @@ function browserRunner(list: Array<{ name: string; src: string }>) {
     return flat.filter(n => !childSet.has(n));
 }
 
-/** Build the exact script sent to the browser (for debugging/logging). */
 export function buildDiscoverScript(): string {
     let script = `// utility functions\n`;
     script += findElementsByCss.toString() + `\n`;
@@ -246,56 +203,58 @@ export function buildDiscoverScript(): string {
     }.toString() + `\n`;
 
     script += `\n` + function buildTree(elements) {
-        // Clone and ensure every node has a children array
         const flat = elements.map(n => ({ ...n, children: [] }));
-
-        // For each node, find the tightest ancestor by DOM containment
         for (let i = 0; i < flat.length; i++) {
             const child = flat[i];
             const childEl = child.element;
             let bestParent = null;
-
             for (let j = 0; j < flat.length; j++) {
                 if (i === j) continue;
                 const maybe = flat[j];
                 const parentEl = maybe.element;
-
                 if (!parentEl || !childEl || parentEl === childEl) continue;
                 if (!parentEl.contains(childEl)) continue;
-
-                // Choose the tightest parent (closest ancestor)
                 if (!bestParent) bestParent = maybe;
-                else if (bestParent.element && bestParent.element.contains(parentEl)) {
-                    bestParent = maybe;
-                }
+                else if (bestParent.element && bestParent.element.contains(parentEl)) bestParent = maybe;
             }
-
-            // Link child to best parent (if any)
             child.__parent = bestParent || null;
             if (bestParent) bestParent.children.push(child);
         }
-
-        // Roots are those without a parent
         const roots = flat.filter(n => !n.__parent);
-
-        // Clean up temp fields
         for (const n of flat) delete n.__parent;
-
         return roots;
     }.toString() + `\n`;
 
     script += `\nreturn buildTree(findElements());`;
-
     return script;
 }
 
-/** Hydrate a DTO forest (as returned by the browser script) into a Root tree. */
+/** Hydrate a DTO forest (from browser) into a Root tree. */
 export function hydrate(session: Session, dtoRoots: Array<AnnotatedDTO<any>>): Root {
     const root = new Root(session);
 
+    const RESERVED = new Set(["children", "element", "$semantic-class"]);
+    function definePropsFromDto(inst: SemanticObject, dto: Record<string, unknown>) {
+        for (const [k, v] of Object.entries(dto)) {
+            if (RESERVED.has(k)) continue;
+            if (typeof v === "function") continue;
+            if (Object.prototype.hasOwnProperty.call(inst, k)) continue;
+            Object.defineProperty(inst, k, {
+                value: v,
+                writable: false,
+                enumerable: true,
+                configurable: true,
+            });
+        }
+    }
+
     function makeNode(dto: AnnotatedDTO<any>): SemanticObject {
         const ctor = registry.ctorOf(dto["$semantic-class"]);
-        const inst = ctor ? new ctor(session, dto) : new SemanticObject(session, dto);
+        const inst = ctor ? new ctor(session) : new SemanticObject(session);
+
+        (inst as any).element = (dto as any).element ?? null;   // attach WD element
+        definePropsFromDto(inst, dto as any);                   // copy DTO props
+
         const kids = dto.children || [];
         for (const child of kids) inst.children.push(makeNode(child));
         return inst;
@@ -307,12 +266,11 @@ export function hydrate(session: Session, dtoRoots: Array<AnnotatedDTO<any>>): R
 
 /** Discover: build → execute → hydrate (no debug logging). */
 export async function discover(session: Session): Promise<Root> {
-  return hydrate(session, await session.executeScript(buildDiscoverScript()));
+    return hydrate(session, await session.executeScript(buildDiscoverScript()));
 }
 
-export function findElementsByCss<
-    T extends object = {}
->(
+/** Browser-side helper, re-exported for user finders. */
+export function findElementsByCss<T extends object = {}>(
     selector: string,
     mapFn: (el: globalThis.Element) => T | undefined
 ): Array<{ element: globalThis.Element } & Omit<T, "element">> {
@@ -326,3 +284,48 @@ export function findElementsByCss<
     }
     return out;
 }
+
+// what to ignore when mapping instance → DTO
+type RuntimeKeys = "children" | "element" | "session";
+
+/* primitive-ish */
+type Primitiveish = string | number | boolean | null | undefined;
+
+/* map WebDriverElement → Element (and recurse through arrays/objects) */
+type ToFinderValue<T> =
+    // direct WD element (nullable/optional also supported)
+    T extends WebDriverElement | null | undefined ? (Element | null) :
+    // arrays (readonly or mutable)
+    T extends readonly (infer U)[] ? ReadonlyArray<ToFinderValue<U>> :
+    T extends (infer U)[] ? ToFinderValue<U>[] :
+    // objects: map each field
+    T extends object ? { [K in keyof T]: ToFinderValue<T[K]> } :
+    // primitives pass through
+    T extends Primitiveish ? T :
+    // everything else is not representable in a finder DTO
+    never;
+
+/* pick only DTO-like keys from an instance type */
+type AllowedDTOKeysOf<T> = {
+    [K in keyof T]-?:
+    // strip runtime-only
+    K extends RuntimeKeys ? never :
+    // drop methods
+    T[K] extends (...args: any[]) => any ? never :
+    // keep only things that can become ToFinderValue (not never)
+    [ToFinderValue<T[K]>] extends [never] ? never : K
+}[keyof T];
+
+/**
+ * The DTO shape produced by `find()` for a given class constructor.
+ * - Always includes `element: Element`
+ * - Includes only allowed instance props
+ * - Converts WebDriverElement → Element (recursively)
+ */
+export type Find<Ctor extends new (...args: any[]) => SemanticObject> =
+    { element: Element } &
+    { [K in AllowedDTOKeysOf<InstanceType<Ctor>>]: ToFinderValue<InstanceType<Ctor>[K]> };
+
+/** Convenience: fields-only part (without the required `element`), suitable for use in findElementsByCss */
+export type FindByCSSFields<Ctor extends new (...args: any[]) => SemanticObject> =
+    Omit<Find<Ctor>, "element">;

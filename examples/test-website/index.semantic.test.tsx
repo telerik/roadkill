@@ -7,42 +7,27 @@ import { Express } from "@progress/roadkill/express.js";
 import { getState, step } from "@progress/roadkill/utils.js";
 import { ChromeDriver } from "@progress/roadkill/chromedriver.js";
 import { Session, WebDriverClient, type Element as WebDriverElement } from "@progress/roadkill/webdriver.js";
-import { semantic, discover, SemanticObject, Root, findElementsByCss, type DTO, type DTOOf } from "@progress/roadkill/semantic.js";
+import { semantic, discover, SemanticObject, Root, findElementsByCss, FindByCSSFields } from "@progress/roadkill/semantic.js";
+import { SemanticJSX, expectSemanticMatch } from "@progress/roadkill/semantic-jsx.js";
 
 const enableLogging = false;
 
 @semantic()
 class LoginPage extends SemanticObject {
-    public readonly titleText: string;
-    private readonly userInput: WebDriverElement | null;
-    private readonly passInput: WebDriverElement | null;
-    private readonly submitBtn: WebDriverElement | null;
+    titleText?: string | null;
+    userInput?: WebDriverElement | null;
+    passInput?: WebDriverElement | null;
+    submitBtn?: WebDriverElement | null;
 
-    static find(): Array<{
-        element: Element;
-        titleText: string;
-        userInput: Element | null;
-        passInput: Element | null;
-        submitBtn: Element | null;
-    }> {
-        return findElementsByCss("main.page-login", el => {
-            const title = el.querySelector("h1");
-            return {
-                element: el,
-                titleText: (title?.textContent || "").trim(),
-                userInput: el.querySelector("#username"),
-                passInput: el.querySelector("#password"),
-                submitBtn: el.querySelector("button[type=submit]"),
-            };
-        });
-    }
-
-    constructor(s: any, dto: DTOOf<typeof LoginPage>) {
-        super(s, dto);
-        this.titleText = dto.titleText;
-        this.userInput = dto.userInput;
-        this.passInput = dto.passInput;
-        this.submitBtn = dto.submitBtn;
+    static find() {
+        return findElementsByCss<FindByCSSFields<typeof LoginPage>>(
+            "main.page-login",
+            element => ({
+                titleText: (element.querySelector("h1")?.textContent || "").trim(),
+                userInput: element.querySelector("#username"),
+                passInput: element.querySelector("#password"),
+                submitBtn: element.querySelector("button[type=submit]"),
+            }));
     }
 
     async login({ username, password }: { username: string; password: string }) {
@@ -56,9 +41,10 @@ class LoginPage extends SemanticObject {
 
 @semantic()
 class GdprFrame extends SemanticObject {
-    static find(): DTO<{}>[] {
-        return findElementsByCss("iframe.overlay-frame", () => ({}));
+    static find() {
+        return findElementsByCss<FindByCSSFields<typeof GdprFrame>>("iframe.overlay-frame", () => ({}));
     }
+
     async switchToFrame() {
         await this.element!.switchToFrame();
     }
@@ -66,20 +52,17 @@ class GdprFrame extends SemanticObject {
 
 @semantic()
 class GdprPanel extends SemanticObject {
-    public readonly headerText: string;
-    private readonly acceptBtn: WebDriverElement | null;
+    headerText?: string;
+    acceptBtn?: WebDriverElement | null;
 
-    static find(): DTO<{ headerText: string; acceptBtn: Element | null }>[] {
-        return findElementsByCss("main.page-gdpr", element => ({
-            headerText: (element.querySelector("h2")?.textContent || "").trim(),
-            acceptBtn: element.querySelector("#accept"),
-        }));
-    }
-
-    constructor(s: any, dto: DTOOf<typeof GdprPanel>) {
-        super(s, dto);
-        this.headerText = dto.headerText;
-        this.acceptBtn = dto.acceptBtn;
+    static find() {
+        return findElementsByCss<FindByCSSFields<typeof GdprPanel>>(
+            "main.page-gdpr",
+            element => ({
+                headerText: (element.querySelector("h2")?.textContent || "").trim(),
+                acceptBtn: element.querySelector("#accept"),
+            })
+        );
     }
 
     async accept() {
@@ -87,26 +70,21 @@ class GdprPanel extends SemanticObject {
     }
 }
 
-// Topics page container (captures header + subtitle; becomes parent of TopicCard via containment)
 @semantic()
 class TocPage extends SemanticObject {
-    public readonly titleText: string;
-    public readonly subtitleText: string;
-    public readonly cardCount: number;
+    titleText?: string;
+    subtitleText?: string;
+    cardCount?: number;
 
-    static find(): DTO<{ titleText: string; subtitleText: string; cardCount: number }>[] {
-        return findElementsByCss("main.page-topics", element => ({
-            titleText: (element.querySelector("h1")?.textContent || "").trim(),
-            subtitleText: (element.querySelector(".muted")?.textContent || "").trim(),
-            cardCount: element.querySelectorAll("#topics-grid .card").length,
-        }));
-    }
-
-    constructor(session: any, dto: DTOOf<typeof TocPage>) {
-        super(session, dto);
-        this.titleText = dto.titleText;
-        this.subtitleText = dto.subtitleText;
-        this.cardCount = dto.cardCount;
+    static find() {
+        return findElementsByCss<FindByCSSFields<typeof TocPage>>(
+            "main.page-topics",
+            element => ({
+                titleText: (element.querySelector("h1")?.textContent || "").trim(),
+                subtitleText: (element.querySelector(".muted")?.textContent || "").trim(),
+                cardCount: element.querySelectorAll("#topics-grid .card").length,
+            })
+        );
     }
 
     cards(): TopicCard[] { return this.childrenOfType(TopicCard); }
@@ -114,23 +92,19 @@ class TocPage extends SemanticObject {
 
 @semantic()
 class TopicCard extends SemanticObject {
-    public readonly title: string;
-    public readonly description: string;
-    public readonly href: string;
+    title?: string;
+    description?: string;
+    href?: string;
 
-    static find(): DTO<{ title: string; description: string; href: string }>[] {
-        return findElementsByCss("#topics-grid .card", element => ({
-            title: (element.querySelector("h3")?.textContent || "").trim(),
-            description: (element.querySelector("p.muted")?.textContent || "").trim(),
-            href: (element.querySelector("a[href]") as HTMLAnchorElement | null)?.href || "",
-        }));
-    }
-
-    constructor(s: any, dto: DTOOf<typeof TopicCard>) {
-        super(s, dto);
-        this.title = dto.title;
-        this.description = dto.description;
-        this.href = dto.href;
+    static find() {
+        return findElementsByCss<FindByCSSFields<typeof TopicCard>>(
+            "#topics-grid .card",
+            element => ({
+                title: (element.querySelector("h3")?.textContent || "").trim(),
+                description: (element.querySelector("p.muted")?.textContent || "").trim(),
+                href: (element.querySelector("a[href]") as HTMLAnchorElement | null)?.href || "",
+            })
+        );
     }
 }
 
@@ -185,6 +159,14 @@ describe("test-website (semantic objects)", () => {
 
         let root: Root = await step("discover login page + iframe", async () => {
             const r = await discover(session);
+
+            expectSemanticMatch(r,
+                <Root>
+                    <LoginPage titleText="Roadkill – Test Login">
+                        <GdprFrame />
+                    </LoginPage>
+                </Root>);
+
             expect(r.toXML("    ")).toBe(
                 `<Root>
     <LoginPage titleText="Roadkill – Test Login">
@@ -204,6 +186,12 @@ describe("test-website (semantic objects)", () => {
 
         await step("discover & accept GDPR", async () => {
             const r = await discover(session);
+
+            expectSemanticMatch(r,
+                <Root>
+                    <GdprPanel headerText="GDPR Consent" />
+                </Root>);
+
             expect(r.toXML("    ")).toBe(
                 `<Root>
     <GdprPanel headerText="GDPR Consent"/>
@@ -231,6 +219,18 @@ describe("test-website (semantic objects)", () => {
 
         await step("discover topics & verify snapshot", async () => {
             const r = await discover(session);
+
+            expectSemanticMatch(r,
+                <Root>
+                    <TocPage cardCount={5} subtitleText="Targetable summary cards for QA flows." titleText="Roadkill – Topics">
+                        <TopicCard description="Standalone server implementing the WebDriver protocol for Chromium browsers. Roadkill manages lifecycle, logs, and startup detection." href="https://chromedriver.chromium.org/" title="ChromeDriver" />
+                        <TopicCard description="The W3C-standard browser automation protocol. Roadkill stays close to spec with typed commands and helpful errors." href="https://www.w3.org/TR/webdriver2/" title="WebDriver" />
+                        <TopicCard description="Higher-level DOM discovery helpers that make selectors readable, robust, and LLM-friendly." href="http://localhost:3000/toc#semantic-objects" title="Semantic Objects" />
+                        <TopicCard description="Checks Chrome/Node/ChromeDriver versions, manages drivers, and streamlines CI/dev workflows." href="http://localhost:3000/toc#roadkill-cli" title="Roadkill CLI" />
+                        <TopicCard description="Expose Roadkill via the Model Context Protocol so LLMs can inspect pages and iteratively author tests." href="https://modelcontextprotocol.io/" title="MCP Integration" />
+                    </TocPage>
+                </Root>);
+
             const xml = r.toXML("    ");
             expect(xml).toBe(
                 `<Root>

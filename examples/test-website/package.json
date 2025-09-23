@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types --no-warnings index.ts",
-    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --detectOpenHandles --forceExit --no-warnings",
-    "prepare": "tsc -p ."
+    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --detectOpenHandles --forceExit --no-warnings"
   },
   "dependencies": {
     "cookie-parser": "^1.4.6",

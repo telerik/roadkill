@@ -8,8 +8,14 @@
     "outDir": "dist",
     "skipLibCheck": true,
     "noEmit": true,
-    "experimentalDecorators": true
+    "experimentalDecorators": true,
+
+    "jsx": "react",
+    "jsxFactory": "SemanticJSX.createElement",
+
+    "disableSourceOfProjectReferenceRedirect": true,
+    "preserveSymlinks": true,
   },
-  "include": ["index.ts"],
+  "include": ["index.ts", "index.test.ts", "index.semantic.test.tsx"],
   "exclude": ["node_modules/**"]
 }
