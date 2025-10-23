@@ -1,0 +1,26 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "extends": "nx/presets/npm.json",
+  "targetDefaults": {
+    "build": {
+      "cache": true,
+      "dependsOn": ["^build"]
+    },
+    "test": {
+      "cache": true,
+      "inputs": ["default", "^default"],
+      "outputs": ["{projectRoot}/coverage"]
+    },
+    "prepare": {
+      "cache": true,
+      "dependsOn": ["^prepare"],
+      "inputs": ["default", "{projectRoot}/tsconfig.json"],
+      "outputs": ["{projectRoot}/*.js", "{projectRoot}/*.d.ts", "{projectRoot}/*.js.map"]
+    }
+  },
+  "defaultBase": "main",
+  "namedInputs": {
+    "default": ["{projectRoot}/**/*", "sharedGlobals"],
+    "sharedGlobals": ["{workspaceRoot}/package.json", "{workspaceRoot}/nx.json"]
+  }
+}
