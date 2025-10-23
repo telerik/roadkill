@@ -2,9 +2,7 @@
   "name": "roadkill",
   "workspaces": [
     "packages/@progress/roadkill",
-    "examples/selenium-interop",
-    "examples/test-website",
-    "examples/vitest-web"
+    "examples/test-website"
   ],
   "engines": {
     "node": "^24.1.0",
