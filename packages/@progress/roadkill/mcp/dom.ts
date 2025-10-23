@@ -17,7 +17,6 @@ function mcpResult<T>(payload: T, summary?: string) {
  */
 export function registerDomTools(server: McpServer) {
 
-    // ── dom.snapshot ──────────────────────────────────────
     server.tool(
         "dom.snapshot",
         "Return a trimmed DOM tree (tag, id, classes, role, aria-*, type, href, text). " +
@@ -134,7 +133,6 @@ export function registerDomTools(server: McpServer) {
         }
     );
 
-    // ── dom.execute ──────────────────────────────────────
     server.tool(
         "dom.execute",
         "Execute custom JavaScript in the browser context. " +
@@ -167,7 +165,6 @@ export function registerDomTools(server: McpServer) {
         }
     );
 
-    // ── dom.testSelector ──────────────────────────────────────
     server.tool(
         "dom.testSelector",
         "Test a CSS selector and return matching element info without creating WebDriver elements. " +
@@ -243,7 +240,6 @@ export function registerDomTools(server: McpServer) {
         }
     );
 
-    // ── dom.getPageInfo ──────────────────────────────────────
     server.tool(
         "dom.getPageInfo",
         "Get basic page information: title, URL, viewport size, and readyState. " +
@@ -286,7 +282,6 @@ export function registerDomTools(server: McpServer) {
         }
     );
 
-    // ── dom.waitForElement ──────────────────────────────────────
     server.tool(
         "dom.waitForElement",
         "Wait for an element to appear using a CSS selector. " +

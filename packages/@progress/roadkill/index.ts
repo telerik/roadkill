@@ -3,4 +3,3 @@ export * from './chromedriver.js';
 export * from './webdriver.js';
 export * from './semantic.js';
 export * from './express.js';
-export * from './utils.js';

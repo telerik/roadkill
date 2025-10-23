@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { readFile, stat, access, mkdir, rm, symlink } from "fs/promises";
-import { exec as execAsync } from "child_process";
+import { exec as execAsync, spawn } from "child_process";
 import { promisify } from "util";
 import yargs from 'yargs'
 import { hideBin } from 'yargs/helpers'
@@ -46,8 +46,49 @@ interface KnownGoodVersionsWithDownloads {
     }[];
 }
 
-yargs(hideBin(process.argv))
-    .command("status", "display system information related to e2e testing", async () => {
+async function startMcpServer() {
+    const mcpScript = join(dirname(fileURLToPath(import.meta.url)), "mcp", "index.js");
+    try {
+        await access(mcpScript);
+    } catch {
+        console.error("MCP server script not found at:", mcpScript);
+        process.exit(1);
+    }
+    
+    // Start the MCP server
+    const child = spawn("node", [mcpScript], {
+        stdio: "inherit",
+        cwd: process.cwd()
+    });
+    
+    child.on("error", (error) => {
+        console.error("Failed to start MCP server:", error);
+        process.exit(1);
+    });
+    
+    child.on("exit", (code) => {
+        process.exit(code || 0);
+    });
+    
+    // Handle graceful shutdown
+    process.on("SIGINT", () => {
+        child.kill("SIGINT");
+    });
+    
+    process.on("SIGTERM", () => {
+        child.kill("SIGTERM");
+    });
+}
+
+const argv = yargs(hideBin(process.argv))
+    .scriptName("roadkill")
+    .usage("$0 [command] [options]")
+    .help()
+    .version()
+    .command("mcp", "Start the Roadkill MCP server (default)", {}, async () => {
+        await startMcpServer();
+    })
+    .command("status", "Display system information related to e2e testing", {}, async () => {
         console.log("Checking up system...");
         const system = getSystem();
         console.log(`Operating system ${system.os} (${system.arch})`);
@@ -197,7 +238,16 @@ yargs(hideBin(process.argv))
             }
         }
     })
-    .parse();
+    .demandCommand(0, 1, "", "Too many commands specified")
+    .parseAsync();
+
+// If no command was specified, start MCP server by default
+(async () => {
+    const parsedArgv = await argv;
+    if (parsedArgv._.length === 0 && !parsedArgv.help && !parsedArgv.version) {
+        await startMcpServer();
+    }
+})();
 
 function getSystem(): { os: OS, arch: Arch} {
     return { os: getOS(), arch: getArch() };

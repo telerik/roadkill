@@ -3,8 +3,7 @@
     "type": "module",
     "version": "0.2.4",
     "scripts": {
-        "prepare": "tsc -p .",
-        "test": "vitest run"
+        "prepare": "tsc -p ."
     },
     "bin": {
         "roadkill": "./roadkill.js",

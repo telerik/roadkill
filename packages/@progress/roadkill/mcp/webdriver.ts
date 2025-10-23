@@ -23,7 +23,6 @@ export const sessions = new Map<string, Session>();
  */
 export function registerWebDriverTools(server: McpServer, getDriverAddress: () => string | null) {
 
-    // ── webdriver.startSession ─────────────────────────────────
     server.tool(
         "webdriver.startSession",
         "Start a WebDriver session and return a sessionId. " +
@@ -66,7 +65,6 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
         }
     );
 
-    // ── webdriver.navigate ─────────────────────────────────────
     server.tool(
         "webdriver.navigate",
         "Navigate an existing session to a URL. " +
@@ -93,7 +91,6 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
         }
     );
 
-    // ── webdriver.findElements (spec-accurate & minimal) ─────────────────────────
     server.tool(
         "webdriver.findElements",
         "Direct WebDriver lookup using the standard locator strategies. " +
@@ -138,7 +135,6 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
         }
     );
 
-    // ── webdriver.clickElement ─────────────────────────────────
     server.tool(
         "webdriver.clickElement",
         "Click an element by WebDriver element id within a session. " +
@@ -162,7 +158,6 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
         }
     );
 
-    // ── webdriver.sendKeys ─────────────────────────────────────
     server.tool(
         "webdriver.sendKeys",
         "Send keystrokes to an element by WebDriver element id within a session.",
@@ -188,7 +183,6 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
         }
     );
 
-    // ── webdriver.takeScreenshot ───────────────────────────────
     server.tool(
         "webdriver.takeScreenshot",
         "Take a screenshot of the current page in a session.",
@@ -209,7 +203,6 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
         }
     );
 
-    // ── webdriver.closeSession ────────────────────────────────
     server.tool(
         "webdriver.closeSession",
         "Dispose (delete) a WebDriver session. " +

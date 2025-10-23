@@ -1,6 +1,5 @@
 import { spawn, ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "child_process";
 import { delimiter } from "path";
-import { URL } from "./utils.js";
 import { platform } from "os";
 import { Server, ServerOptions } from "./server.js";
 
@@ -47,7 +46,7 @@ export interface ChromeDriverOptions extends ServerOptions {
 export class ChromeDriver extends Server<ChromeDriverOptions> {
 
     private _port: undefined | number;
-    private _address: undefined | URL;
+    private _address: undefined | string;
 
     private startupLine: string[] = [];
     

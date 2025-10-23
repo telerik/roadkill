@@ -191,10 +191,47 @@ export type TimeoutsConfiguration = {
 
 /**
  * [10. Navigation](https://www.w3.org/TR/webdriver2/#navigation)
+ * 
+ * Controls when WebDriver considers a page navigation to be complete.
  */
 export enum PageLoadStrategy {
+    /**
+     * WebDriver will not wait for any page loading to complete.
+     * Returns immediately after the initial navigation request is sent.
+     * Use this for maximum speed when you don't need the page to be ready.
+     * 
+     * **Warning**: Elements may not be available immediately after navigation.
+     * You'll need to handle timing yourself or use explicit waits.
+     */
     none = "none",
+    
+    /**
+     * WebDriver waits until the DOMContentLoaded event is fired.
+     * This means the HTML document has been completely loaded and parsed,
+     * but stylesheets, images, and subframes may still be loading.
+     * 
+     * **Recommended** for most use cases, especially sites with:
+     * - Heavy advertising content
+     * - Third-party widgets
+     * - Slow-loading images or videos
+     * - Analytics scripts that might delay completion
+     * 
+     * This is the sweet spot between speed and reliability.
+     */
     eager = "eager",
+    
+    /**
+     * WebDriver waits until the page is completely loaded.
+     * This includes all content, images, stylesheets, and subframes.
+     * 
+     * **Default behavior** but can be slow on modern websites with:
+     * - Tracking pixels
+     * - Advertisement networks
+     * - Social media widgets
+     * - Analytics that load indefinitely
+     * 
+     * Only use this when you need to ensure ALL resources are loaded.
+     */
     normal = "normal"
 }
 
@@ -543,6 +580,40 @@ export class WebDriverClient {
     }
 
     /**
+     * Delays execution for the specified number of milliseconds.
+     * Uses the context mechanism to respect signals from any associated context.
+     * 
+     * @param milliseconds The delay in milliseconds
+     * @param signal An optional additional signal to combine with context signals
+     * @returns A promise that resolves after the delay or rejects if aborted
+     */
+    public timeout(milliseconds: number, signal?: AbortSignal): Promise<void> {
+        const withSignal = this.withSignal(signal);
+        withSignal?.throwIfAborted();
+
+        return new Promise<void>((resolve, reject) => {
+            withSignal?.throwIfAborted();
+
+            const timeoutId = setTimeout(() => {
+                cleanup();
+                resolve();
+            }, milliseconds);
+            
+            const cleanup = () => {
+                clearTimeout(timeoutId);
+                withSignal?.removeEventListener('abort', onAbort);
+            };
+            
+            const onAbort = () => {
+                cleanup();
+                reject(withSignal.reason);
+            };
+            
+            withSignal?.addEventListener('abort', onAbort);
+        });
+    }
+
+    /**
      * 8.1 New Session
      * https://www.w3.org/TR/webdriver2/#new-session
      */
@@ -704,6 +775,41 @@ export class Session implements Disposable, AsyncDisposable, Serializer {
         };
         
         return contextSession as T;
+    }
+
+    /**
+     * Delays execution for the specified number of milliseconds.
+     * Uses the context mechanism to respect signals from any associated context.
+     * 
+     * @param options The timeout options
+     * @param options.ms The delay in milliseconds
+     * @param options.signal An optional additional signal to combine with context signals
+     * @returns A promise that resolves after the delay or rejects if aborted
+     */
+    public timeout(milliseconds: number, signal?: AbortSignal): Promise<void> {
+        const withSignal = this.withSignal(signal);
+        withSignal?.throwIfAborted();
+
+        return new Promise<void>((resolve, reject) => {
+            withSignal?.throwIfAborted();
+
+            const timeoutId = setTimeout(() => {
+                cleanup();
+                resolve();
+            }, milliseconds);
+            
+            const cleanup = () => {
+                clearTimeout(timeoutId);
+                withSignal?.removeEventListener('abort', onAbort);
+            };
+            
+            const onAbort = () => {
+                cleanup();
+                reject(withSignal.reason);
+            };
+            
+            withSignal?.addEventListener('abort', onAbort);
+        });
     }
 
     /**
@@ -1486,3 +1592,5 @@ export class ShadowRoot implements ShadowRootReference {
         });
     }
 }
+
+

@@ -1,8 +1,7 @@
 import { describe, test, beforeAll, afterAll } from "vitest";
 import { Builder, Browser, WebDriver } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
-import { sleep } from "@progress/roadkill/utils.js";
-import { Session, WebDriverClient, type MatchingCapabilities } from "@progress/roadkill/webdriver.js";
+import { Session, WebDriverClient, type MatchingCapabilities, } from "@progress/roadkill/webdriver.js";
 
 describe("w3schools", () => {
 
@@ -32,9 +31,9 @@ describe("w3schools", () => {
         await driver?.quit();
     });
 
-    test.skip("navigate to js statements page", async () => {
+    test.skip("navigate to js statements page", async context => {
         await driver.navigate().to('http://www.w3schools.com');
-        await sleep(3000);
+        await session.timeout(3000, context.signal);
         await session.navigateTo('http://www.w3schools.com/js')
     }, 20000);
 });

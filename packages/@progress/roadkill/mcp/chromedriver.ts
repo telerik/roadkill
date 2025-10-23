@@ -99,7 +99,6 @@ export function getDriverAddress(): string | null {
  */
 export function registerChromeDriverTools(server: McpServer) {
 
-    // ── chromedriver.status ───────────────────────────────────────
     server.tool(
         "chromedriver.status",
         "Report ChromeDriver state/address. " +
@@ -113,7 +112,6 @@ export function registerChromeDriverTools(server: McpServer) {
         }
     );
 
-    // ── chromedriver.start ───────────────────────────────────────
     server.tool(
         "chromedriver.start",
         "Start ChromeDriver service if not already running. " +
@@ -132,7 +130,6 @@ export function registerChromeDriverTools(server: McpServer) {
         }
     );
 
-    // ── chromedriver.stop ───────────────────────────────────────
     server.tool(
         "chromedriver.stop",
         "Stop ChromeDriver service. " +
@@ -155,7 +152,6 @@ export function registerChromeDriverTools(server: McpServer) {
         }
     );
 
-    // ── chromedriver.restart ───────────────────────────────────────
     server.tool(
         "chromedriver.restart",
         "Restart ChromeDriver service (stop then start). " +
