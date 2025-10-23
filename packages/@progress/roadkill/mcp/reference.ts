@@ -108,9 +108,7 @@ export default defineConfig({
                 {
                     filename: "example.test.ts",
                     content:
-`import { ChromeDriver } from "@progress/roadkill/chromedriver.js";
-import { WebDriverClient, Session, by } from "@progress/roadkill/webdriver.js";
-import { discover } from "@progress/roadkill/semantic.js";
+`import { ChromeDriver, WebDriverClient, Session, by } from "@progress/roadkill";
 import { describe, test, beforeAll, afterAll, expect } from "vitest";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
@@ -118,37 +116,35 @@ import { join } from "path";
 describe("example.com automation", () => {
     let chromedriver: ChromeDriver;
     let webdriver: WebDriverClient;
-    let session: Session;
+    let suiteSession: Session;
 
     beforeAll(async () => {
         chromedriver = new ChromeDriver({ args: ["--port=9515"] });
         await chromedriver.start();
         webdriver = new WebDriverClient({ address: chromedriver.address });
-        session = await webdriver.newSession({
+        suiteSession = await webdriver.newSession({
             capabilities: { timeouts: { implicit: 2000 } }
         });
     }, 30000);
 
     afterAll(async () => { 
         try { 
-            await session?.[Symbol.asyncDispose](); 
+            await suiteSession?.[Symbol.asyncDispose](); 
         } finally { 
             await chromedriver?.[Symbol.asyncDispose](); 
         } 
     }, 20000);
 
-    test("navigate and discover semantic objects", async () => {
+    test("navigate and interact with page", async (context) => {
+        const session = suiteSession.context(context);
+        
         await session.navigateTo("https://example.com");
 
-        // Discover semantic objects on the page
-        const root = await discover(session);
-        console.log("Discovered semantic objects:", root);
-
-        // Try a robust selector: link text
+        // Find By
         const link = await session.findElement(by.link("More information..."));
         await link.click();
 
-        // Take screenshot
+        // Take a screenshot
         const png = await session.takeScreenshot();
         const dir = join("test-results");
         await mkdir(dir, { recursive: true });
