@@ -147,3 +147,30 @@ Duration   1.23s
 ```
 
 All WebDriver sessions and resources are automatically cleaned up using ECMAScript disposable patterns.
+
+## Model Context Protocol (MCP) Integration
+
+Roadkill includes a Model Context Protocol server that provides WebDriver automation tools to AI assistants like Claude Desktop.
+
+### VS Code MCP Configuration
+
+To use Roadkill's MCP server in VS Code with the Claude Desktop extension, add this configuration to your MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "roadkill": {
+      "command": "npx",
+      "args": ["@progress/roadkill"]
+    }
+  }
+}
+```
+
+This provides access to ChromeDriver management, WebDriver session control, DOM exploration, and semantic page object discovery tools directly in your AI chat interface.
+
+**Available MCP Tools:**
+- **ChromeDriver**: `chromedriver.start`, `chromedriver.stop`, `chromedriver.status`, `chromedriver.restart`
+- **WebDriver**: Session management, navigation, element interaction, screenshots
+- **DOM Browser**: Page snapshots, selector testing, script execution
+- **Semantic Discovery**: Intelligent page object discovery and interaction

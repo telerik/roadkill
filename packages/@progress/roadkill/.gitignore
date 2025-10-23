@@ -1,1 +1,4 @@
 downloads/
+*.d.ts
+*.js
+*.js.map

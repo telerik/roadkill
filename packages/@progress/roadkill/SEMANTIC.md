@@ -7,7 +7,7 @@
 * Arranged in a **tree** by **DOM containment** using each object's anchor **element**.
 * Used with **methods for interactions** (click/type) and **properties for assertions**.
 
-The workflow is: **discover → hydrate → assert → (optionally) interact**.
+The workflow is: **discover - hydrate - assert - (optionally) interact**.
 
 ---
 
@@ -74,8 +74,8 @@ Semantic Objects are **discovered at runtime**, capturing values up front so ass
 
 * Node hydrates DTOs to instances and you get:
 
-  * `JSON.stringify(root, null, "  ")` → compact tuple snapshots: `["Class", {props}, ...children]`
-  * `root.toXML()` → pretty XML snapshots (future XPath-ready)
+  * `JSON.stringify(root, null, "  ")` - compact tuple snapshots: `["Class", {props}, ...children]`
+  * `root.toXML()` - pretty XML snapshots (future XPath-ready)
 
 ---
 

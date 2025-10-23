@@ -44,7 +44,7 @@ export type DTOOf<C extends {
 export declare function buildDiscoverScript(): string;
 /** Hydrate a DTO forest (from browser) into a Root tree. */
 export declare function hydrate(session: Session, dtoRoots: Array<AnnotatedDTO<unknown>>): Root;
-/** Discover: build → execute → hydrate (no debug logging). */
+/** Discover: build - execute - hydrate (no debug logging). */
 export declare function discover(session: Session): Promise<Root>;
 /** Browser-side helper, re-exported for user finders. */
 export declare function findElementsByCss<T extends object = {}>(selector: string, mapFn: (el: globalThis.Element) => T | undefined): Array<{
@@ -64,7 +64,7 @@ type AllowedDTOKeysOf<T> = {
  * The DTO shape produced by `find()` for a given class constructor.
  * - Always includes `element: Element`
  * - Includes only allowed instance props
- * - Converts WebDriverElement → Element (recursively)
+ * - Converts WebDriverElement - Element (recursively)
  */
 export type Find<Ctor extends new (...args: any[]) => SemanticObject> = {
     element: Element;

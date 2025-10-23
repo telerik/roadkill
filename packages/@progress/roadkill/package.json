@@ -8,7 +8,7 @@
     },
     "bin": {
         "roadkill": "./roadkill.js",
-        "roadkill-mcp": "./roadkill-mcp.js"
+        "roadkill-mcp": "./mcp/index.js"
     },
     "license": "MIT",
     "repository": {
@@ -40,20 +40,11 @@
         "README.md",
         "LICENSE",
         "package.json",
-        "roadkill.js",
-        "roadkill.js.map",
-        "roadkill.ts",
-        "webdriver.js",
-        "webdriver.js.map",
-        "webdriver.ts",
-        "utils.js",
-        "utils.js.map",
-        "utils.ts",
-        "chromedriver.js",
-        "chromedriver.js.map",
-        "chromedriver.ts",
-        "server.ts",
-        "server.js.map",
-        "server.js"
+        "*.js",
+        "*.js.map",
+        "*.d.ts",
+        "mcp/*.js",
+        "mcp/*.js.map",
+        "mcp/*.d.ts"
     ]
 }

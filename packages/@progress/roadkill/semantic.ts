@@ -273,7 +273,7 @@ export function hydrate(session: Session, dtoRoots: Array<AnnotatedDTO<unknown>>
     return root;
 }
 
-/** Discover: build → execute → hydrate (no debug logging). */
+/** Discover: build - execute - hydrate (no debug logging). */
 export async function discover(session: Session): Promise<Root> {
     try {
         const script = buildDiscoverScript();
@@ -300,13 +300,13 @@ export function findElementsByCss<T extends object = {}>(
     return out;
 }
 
-// what to ignore when mapping instance → DTO
+// what to ignore when mapping instance - DTO
 type RuntimeKeys = "children" | "element" | "session";
 
 /* primitive-ish */
 type Primitiveish = string | number | boolean | null | undefined;
 
-/* map WebDriverElement → Element (and recurse through arrays/objects) */
+/* map WebDriverElement - Element (and recurse through arrays/objects) */
 type ToFinderValue<T> =
     // direct WD element (nullable/optional also supported)
     T extends WebDriverElement | null | undefined ? (Element | null) :
@@ -335,7 +335,7 @@ type AllowedDTOKeysOf<T> = {
  * The DTO shape produced by `find()` for a given class constructor.
  * - Always includes `element: Element`
  * - Includes only allowed instance props
- * - Converts WebDriverElement → Element (recursively)
+ * - Converts WebDriverElement - Element (recursively)
  */
 export type Find<Ctor extends new (...args: any[]) => SemanticObject> =
     { element: Element } &
