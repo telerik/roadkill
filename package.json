@@ -23,8 +23,9 @@
     "build:affected": "nx affected -t prepare",
     "graph": "nx graph",
     "reset": "nx reset",
-    "lerna:version": "lerna version --no-git-tag-version --no-push",
-    "lerna:publish": "lerna publish"
+    "release": "nx release",
+    "version": "nx release version",
+    "publish": "nx release publish"
   },
   "files": [
     "LICENSE",
@@ -32,7 +33,7 @@
     "package.json"
   ],
   "devDependencies": {
-    "lerna": "^7.3.0",
+    "@nx/js": "^22.0.1",
     "nx": "22.0.1"
   }
 }

@@ -22,5 +22,20 @@
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "sharedGlobals": ["{workspaceRoot}/package.json", "{workspaceRoot}/nx.json"]
+  },
+  "release": {
+    "projectsRelationship": "independent",
+    "changelog": {
+      "workspaceChangelog": false,
+      "projectChangelogs": true
+    },
+    "version": {
+      "conventionalCommits": true
+    },
+    "git": {
+      "commit": true,
+      "tag": true
+    },
+    "releaseTagPattern": "{projectName}@{version}"
   }
 }

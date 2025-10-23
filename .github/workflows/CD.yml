@@ -14,9 +14,6 @@ jobs:
       packages: read
 
     steps:
-      - uses: actions/setup-node@v3
-        with:
-          node-version: ^24.1
       - name: import secrets
         id: import-secrets
         uses: LanceMcCarthy/akeyless-action@v3
@@ -28,22 +25,52 @@ jobs:
               "/WebComponents/prod/tokens/PROGRESS_NPM_REGISTRY_TOKEN": "NPM_TOKEN"
             }
           export-secrets-to-environment: false
+      
       - name: git config
         run: |
           git config --global user.email "kendo-bot@progress.com"
           git config --global user.name "kendo-bot"
+      
       - name: git checkout
         uses: actions/checkout@v4
         with:
           token: ${{ steps.import-secrets.outputs.GH_TOKEN }}
+          fetch-depth: 0  # Needed for Nx affected commands and release
+      
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ^24.1
+          cache: 'npm'
+      
+      # Setup Nx cache for faster builds
+      - name: Setup Nx cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            node_modules/.cache/nx
+            .nx/cache
+          key: ${{ runner.os }}-nx-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nx-
+      
       - name: install virtual display
         run: sudo apt-get install xvfb
+      
       - name: npm install
         run: npm ci
-      - name: npm test
+      
+      # Build all projects to ensure everything is ready for publishing
+      - name: build all
+        run: npm run build
+      
+      # Test all projects to ensure quality before publishing
+      - name: test all
         run: xvfb-run --auto-servernum npm test
-      - name: lerna publish
-        run: npm run lerna:publish
+      
+      # Nx handles versioning and publishing with semantic versioning
+      - name: nx release
+        run: npm run release
         env:
           NPM_TOKEN: ${{ steps.import-secrets.outputs.NPM_TOKEN }}
           GH_TOKEN: ${{ steps.import-secrets.outputs.GH_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ steps.import-secrets.outputs.NPM_TOKEN }}
