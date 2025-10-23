@@ -660,11 +660,11 @@ export declare class Session implements Disposable, AsyncDisposable, Serializer 
     /**
      * [13.2.1 Execute Script](https://www.w3.org/TR/webdriver2/#execute-script)
      */
-    executeScript(script: string, signal?: AbortSignal, ...args: unknown[]): Promise<unknown>;
+    executeScript(script: string | Function, signal?: AbortSignal, ...args: unknown[]): Promise<unknown>;
     /**
      * [13.2.2 Execute Async Script](https://www.w3.org/TR/webdriver2/#execute-async-script)
      */
-    executeScriptAsync(script: string, signal?: AbortSignal, ...args: unknown[]): Promise<unknown>;
+    executeScriptAsync(script: string | Function, signal?: AbortSignal, ...args: unknown[]): Promise<unknown>;
     /**
      * [14.1 Get All Cookies](https://www.w3.org/TR/webdriver2/#get-all-cookies)
      */

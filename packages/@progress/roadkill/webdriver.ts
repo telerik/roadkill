@@ -1103,9 +1103,10 @@ export class Session implements Disposable, AsyncDisposable, Serializer {
     /**
      * [13.2.1 Execute Script](https://www.w3.org/TR/webdriver2/#execute-script)
      */
-    public async executeScript(script: string, signal?: AbortSignal, ...args: unknown[]): Promise<unknown> {
+    public async executeScript(script: string | Function, signal?: AbortSignal, ...args: unknown[]): Promise<unknown> {
+        const scriptCode = typeof script === 'function' ? convertFunctionToScript(script) : script;
         try {
-            return await this.request("POST", `/session/${this.sessionId}/execute/sync`, { script, args }, signal);
+            return await this.request("POST", `/session/${this.sessionId}/execute/sync`, { script: scriptCode, args }, signal);
         } catch (cause) {
             throw new WebDriverMethodError(`Failed to execute script.`, { cause });
         }
@@ -1114,9 +1115,10 @@ export class Session implements Disposable, AsyncDisposable, Serializer {
     /**
      * [13.2.2 Execute Async Script](https://www.w3.org/TR/webdriver2/#execute-async-script)
      */
-    public async executeScriptAsync(script: string, signal?: AbortSignal, ...args: unknown[]): Promise<unknown> {
+    public async executeScriptAsync(script: string | Function, signal?: AbortSignal, ...args: unknown[]): Promise<unknown> {
+        const scriptCode = typeof script === 'function' ? convertFunctionToScript(script) : script;
         try {
-            return await this.request("POST", `/session/${this.sessionId}/execute/async`, { script, args }, signal);
+            return await this.request("POST", `/session/${this.sessionId}/execute/async`, { script: scriptCode, args }, signal);
         } catch (cause) {
             throw new WebDriverMethodError(`Failed to execute script async.`, { cause });
         }
@@ -1593,4 +1595,9 @@ export class ShadowRoot implements ShadowRootReference {
     }
 }
 
-
+/**
+ * Convert a function to executable script code by wrapping it to handle arguments and return values
+ */
+function convertFunctionToScript(fn: Function): string {
+    return `return (${fn.toString()}).apply(this, arguments)`;
+}

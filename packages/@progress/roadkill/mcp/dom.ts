@@ -1,11 +1,223 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
 import { sessions } from "./webdriver.js";
 
 /**
+ * Input and button type literals for form elements
+ */
+type InputType = 
+    | "text" | "password" | "email" | "number" | "tel" | "url" | "search" 
+    | "date" | "time" | "datetime-local" | "month" | "week" | "color" 
+    | "range" | "file" | "hidden" | "checkbox" | "radio" | "submit" 
+    | "button" | "reset" | "image" | string;
+
+/**
+ * Element node in the DOM tree
+ */
+interface ElementToken {
+    /** HTML tag name (e.g., "div", "span", "input") */
+    element: string;
+    /** Element ID attribute */
+    id?: string;
+    /** CSS class names */
+    classes?: string[];
+    /** ARIA role attribute */
+    role?: string;
+    /** Input type, button type, etc. */
+    type?: InputType;
+    /** Link href attribute */
+    href?: string;
+    /** ARIA attributes (aria-*) */
+    aria?: Record<string, string>;
+    /** Element bounding box [x, y, width, height] relative to page top-left (outer border, excluding margin) */
+    frame?: [number, number, number, number];
+    /** True if element is not visible (display:none, visibility:hidden, etc.) */
+    hidden?: boolean;
+    /** True if element matches a selector query (used in dom-test-selector) */
+    match?: boolean;
+    /** Child content (text strings and elements) */
+    content?: DomToken[];
+}
+
+/**
+ * Union type for all DOM tokens - either a text string or an element object
+ */
+type DomToken = string | ElementToken;
+
+/**
+ * Root result from DOM snapshot - same structure as ElementToken
+ * but represents specifically the root element of a snapshot
+ */
+type DomSnapshotResult = ElementToken;
+
+/**
+ * DOM snapshot function that will be executed in the browser context
+ */
+function domSnapshotScript(): DomSnapshotResult | { error: string; selector?: string } {
+    const opts = arguments[0] || {};
+    const selector = opts.rootSelector;
+
+    const root = selector ? document.querySelector(selector) : document.body;
+    if (!root) return { error: "root-not-found", selector };
+
+    const ELEMENT_NODE = 1;
+    const TEXT_NODE = 3;
+    const norm = (s: any) => (s ?? "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+
+    function nodeTypeTag(el: any) { return el.tagName ? el.tagName.toLowerCase() : ""; }
+    function nodeElementType(el: any, tag: string) {
+        if (tag === "button" && el.type) return String(el.type);
+        if (tag === "input"  && el.type) return String(el.type);
+        return undefined;
+    }
+    function nodeHref(el: any, tag: string) { return (tag === "a" && el.href) ? String(el.href) : undefined; }
+
+    function snapElement(el: any): ElementToken {
+        const tag = nodeTypeTag(el);
+        const id = el.id || undefined;
+        const classes = el.classList ? Array.from(el.classList).map(String) : [];
+        const role = el.getAttribute && el.getAttribute("role") || undefined;
+        const elementType = nodeElementType(el, tag);
+        const href = nodeHref(el, tag);
+
+        // Get element frame (bounding box) and visibility
+        let frame: [number, number, number, number] | undefined = undefined;
+        let hidden: boolean | undefined = undefined;
+        try {
+            // Check if element is intentionally hidden (not just layout/structural)
+            const computedStyle = window.getComputedStyle && window.getComputedStyle(el);
+            
+            // Elements that are structurally invisible but not "hidden" content
+            const structuralElements = new Set(['br', 'hr', 'wbr', 'area', 'base', 'col', 'colgroup', 'embed', 'link', 'meta', 'source', 'track', 'param']);
+            const isStructural = structuralElements.has(tag);
+            
+            // Check if any parent is intentionally hidden by CSS
+            const isParentHidden = (function() {
+                let parent = el.parentElement;
+                while (parent && parent !== document.body) {
+                    const parentStyle = window.getComputedStyle && window.getComputedStyle(parent);
+                    if (parentStyle && (
+                        parentStyle.display === "none" ||
+                        parentStyle.visibility === "hidden" ||
+                        parseFloat(parentStyle.opacity || "1") === 0
+                    )) {
+                        return true;
+                    }
+                    // Removed check for parent.hidden - only consider CSS properties
+                    parent = parent.parentElement;
+                }
+                return false;
+            })();
+            
+            // Check for intentional hiding via CSS properties only
+            const hasDisplayNone = computedStyle && computedStyle.display === "none";
+            const hasVisibilityHidden = computedStyle && computedStyle.visibility === "hidden";
+            const hasZeroOpacity = computedStyle && parseFloat(computedStyle.opacity || "1") === 0;
+            
+            // Check if element is CSS-visible (has proper display and visibility)
+            const isCssVisible = computedStyle && 
+                computedStyle.display !== "none" && 
+                computedStyle.visibility !== "hidden" && 
+                parseFloat(computedStyle.opacity || "1") > 0;
+            
+            // Determine if element is intentionally hidden - only consider CSS properties, not HTML hidden attribute
+            const isIntentionallyHidden = 
+                hasDisplayNone ||
+                hasVisibilityHidden ||
+                hasZeroOpacity ||
+                isParentHidden ||
+                (el.offsetParent === null && !isStructural && computedStyle && computedStyle.position !== "fixed");
+
+            if (isIntentionallyHidden) {
+                hidden = true;
+            } else {
+                const rect = el.getBoundingClientRect();
+                // Always try to get coordinates for elements that aren't CSS-hidden
+                if (rect) {
+                    // Convert to page coordinates (add scroll offset)
+                    const x = Math.round(rect.left + window.scrollX);
+                    const y = Math.round(rect.top + window.scrollY);
+                    const width = Math.round(rect.width);
+                    const height = Math.round(rect.height);
+                    frame = [x, y, width, height];
+                }
+                // Never mark as hidden unless explicitly CSS-hidden
+            }
+        } catch (e) {
+            // getBoundingClientRect might fail on some elements
+        }
+
+        const aria: any = {};
+        if (el.hasAttributes && el.hasAttributes()) {
+            for (const a of Array.from(el.attributes)) {
+                if ((a as any).name && (a as any).name.startsWith("aria-")) {
+                    aria[(a as any).name] = (a as any).value;
+                }
+            }
+        }
+
+        // Process child nodes (including text nodes and elements)
+        const content: DomToken[] = [];
+        const childNodes = el.childNodes ? Array.from(el.childNodes) : [];
+        
+        for (const child of childNodes) {
+            const node = child as any;
+            if (node.nodeType === TEXT_NODE) {
+                const text = norm(node.textContent || "");
+                if (text) {
+                    content.push(text);
+                }
+            } else if (node.nodeType === ELEMENT_NODE) {
+                const childElement = snapElement(node);
+                if (childElement) {
+                    // Filter out structural elements with no meaningful properties
+                    const childTag = childElement.element;
+                    const structuralElements = new Set(['br', 'hr', 'wbr', 'area', 'base', 'col', 'colgroup', 'embed', 'link', 'meta', 'source', 'track', 'param']);
+                    const isStructural = structuralElements.has(childTag);
+                    
+                    if (isStructural) {
+                        // Only include structural elements if they have meaningful properties
+                        const hasProperties = childElement.id || 
+                                            (childElement.classes && childElement.classes.length > 0) || 
+                                            childElement.role || 
+                                            childElement.type || 
+                                            childElement.href || 
+                                            (childElement.aria && Object.keys(childElement.aria).length > 0) ||
+                                            (childElement.content && childElement.content.length > 0);
+                        
+                        if (hasProperties) {
+                            content.push(childElement);
+                        }
+                        // Otherwise skip this structural element entirely
+                    } else {
+                        content.push(childElement);
+                    }
+                }
+            }
+        }
+
+        return {
+            element: tag,
+            id,
+            classes: classes.length ? classes : undefined,
+            role,
+            type: elementType,
+            href,
+            aria: Object.keys(aria).length ? aria : undefined,
+            frame,
+            hidden,
+            content: content.length ? content : undefined
+        };
+    }
+
+    return snapElement(root) as DomSnapshotResult;
+}
+
+/**
  * Return both a readable summary and a machine-parseable JSON payload.
  */
-function mcpResult<T>(payload: T, summary?: string) {
+function mcpResult<T>(payload: T, summary?: string): CallToolResult {
     const parts: Array<{ type: "text"; text: string }> = [];
     if (summary) parts.push({ type: "text", text: summary });
     parts.push({ type: "text", text: JSON.stringify(payload) });
@@ -19,7 +231,9 @@ export function registerDomTools(server: McpServer) {
 
     server.tool(
         "dom-snapshot",
-        "Return a complete DOM tree (tag, id, classes, role, aria-*, type, href, text). " +
+        "Return a complete DOM tree (tag, id, classes, role, aria-*, type, href, text, frame, hidden). " +
+        "Frame coordinates are [x, y, width, height] relative to page top-left (outer border, excluding margin). " +
+        "Hidden elements have hidden=true and no frame coordinates. " +
         "LLM: Use to understand page structure and propose stable selectors. Prefer id/role/unique text.",
         {
             sessionId: z
@@ -33,81 +247,39 @@ export function registerDomTools(server: McpServer) {
             format: z
                 .enum(["html", "json"])
                 .describe("Output format (default: html)")
-                .default("html")
+                .default("html"),
+            includeScreenshot: z
+                .boolean()
+                .describe("Include base64 PNG screenshot of the page")
+                .default(false)
         },
-        async ({ sessionId, rootSelector, format = "html" }) => {
+        async ({ sessionId, rootSelector, format = "html", includeScreenshot = false }): Promise<CallToolResult> => {
             const session = sessions.get(sessionId);
             if (!session) throw new Error(`Session not found: ${sessionId}`);
 
-            const tree = await session.executeScript(
-                `
-                return (function() {
-                    const opts = arguments[0] || {};
-                    const selector = opts.rootSelector;
+            const tree = await session.executeScript(domSnapshotScript, undefined, { rootSelector });
 
-                    const root = selector ? document.querySelector(selector) : document.body;
-                    if (!root) return { error: "root-not-found", selector };
+            // Capture screenshot if requested
+            let screenshot: string | undefined = undefined;
+            if (includeScreenshot) {
+                try {
+                    screenshot = await session.takeScreenshot();
+                } catch (e) {
+                    // Screenshot failed, continue without it
+                }
+            }
 
-                    const ELEMENT_NODE = 1;
-                    const norm = s => (s ?? "").replace(/\\s+/g, " ").replace(/^\\s+|\\s+$/g, "");
-
-                    function nodeTypeTag(el) { return el.tagName ? el.tagName.toLowerCase() : ""; }
-                    function nodeTypeAttr(el, tag) {
-                        if (tag === "button" && el.type) return String(el.type);
-                        if (tag === "input"  && el.type) return String(el.type);
-                        return undefined;
-                    }
-                    function nodeHref(el, tag) { return (tag === "a" && el.href) ? String(el.href) : undefined; }
-                    function nodeText(el) {
-                        const raw = (el.innerText ?? el.textContent ?? "");
-                        return norm(raw);
-                    }
-
-                    function snap(el, depth) {
-                        if (!el || (el.nodeType || 0) !== ELEMENT_NODE) return null;
-
-                        const tag = nodeTypeTag(el);
-                        const id = el.id || undefined;
-                        const classes = el.classList ? Array.from(el.classList) : [];
-                        const role = el.getAttribute && el.getAttribute("role") || undefined;
-                        const type = nodeTypeAttr(el, tag);
-                        const href = nodeHref(el, tag);
-                        const text = nodeText(el);
-
-                        const aria = {};
-                        if (el.hasAttributes && el.hasAttributes()) {
-                            for (const a of el.attributes) {
-                                if (a.name && a.name.startsWith("aria-")) aria[a.name] = a.value;
-                            }
-                        }
-
-                        const kids = [];
-                        const children = el.children ? Array.from(el.children) : [];
-                        for (let i = 0; i < children.length; i++) {
-                            const child = snap(children[i], depth + 1);
-                            if (child) kids.push(child);
-                        }
-
-                        return {
-                            tag, id, classes, role, type, href, text,
-                            aria: Object.keys(aria).length ? aria : undefined,
-                            children: kids.length ? kids : undefined
-                        };
-                    }
-
-                    return snap(root, 0);
-                })();
-                `,
-                undefined,
-                { rootSelector }
-            );
-
-            // Convert tree to HTML format if requested
+            // Convert tree to HTML format if requested (legacy support)
             function treeToHtml(node: any, indent = 0): string {
                 if (!node) return "";
                 
+                // Handle text nodes (now just strings)
+                if (typeof node === 'string') {
+                    return node;
+                }
+                
                 const spaces = "  ".repeat(indent);
-                const tag = node.tag || "unknown";
+                const tag = node.element || "unknown";
                 
                 // Build attributes string
                 const attrs = [];
@@ -116,6 +288,13 @@ export function registerDomTools(server: McpServer) {
                 if (node.role) attrs.push(`role="${node.role}"`);
                 if (node.type) attrs.push(`type="${node.type}"`);
                 if (node.href) attrs.push(`href="${node.href}"`);
+                if (node.frame) {
+                    attrs.push(`frame="${node.frame.join(" ")}"`);
+                }
+                // Only show hidden if element is actually CSS-hidden (not just HTML hidden attribute)
+                if (node.hidden && node.frame === undefined) {
+                    attrs.push(`hidden`);
+                }
                 
                 // Add aria attributes
                 if (node.aria) {
@@ -133,35 +312,53 @@ export function registerDomTools(server: McpServer) {
                     return `${spaces}<${tag}${attrStr}>`;
                 }
                 
-                const hasText = node.text && node.text.length > 0;
-                const hasChildren = node.children && node.children.length > 0;
+                const hasContent = node.content && node.content.length > 0;
                 
-                // Handle empty tags (no text, no children) as self-closing
-                if (!hasText && !hasChildren) {
+                // Handle empty tags as self-closing
+                if (!hasContent) {
                     return `${spaces}<${tag}${attrStr}/>`;
                 }
                 
                 // Build opening tag
                 let result = `${spaces}<${tag}${attrStr}>`;
                 
-                // Add text content if present
-                if (hasText) {
-                    result += node.text;
-                }
-                
-                // Add children if present
-                if (hasChildren) {
-                    const childrenHtml = [];
-                    for (const child of node.children) {
-                        const childHtml = treeToHtml(child, indent + 1);
-                        if (childHtml) {
-                            childrenHtml.push(childHtml);
+                // Add content
+                if (hasContent) {
+                    const contentHtml = [];
+                    let hasTextContent = false;
+                    let hasElementContent = false;
+                    
+                    // First pass: determine content types
+                    for (const item of node.content) {
+                        if (typeof item === 'string') {
+                            hasTextContent = true;
+                        } else {
+                            hasElementContent = true;
                         }
                     }
                     
-                    if (childrenHtml.length > 0) {
-                        // Add single newline before children (whether we have text or not)
-                        result += "\n" + childrenHtml.join("\n") + "\n" + spaces;
+                    // Second pass: process content with proper indentation
+                    for (let i = 0; i < node.content.length; i++) {
+                        const item = node.content[i];
+                        if (typeof item === 'string') {
+                            // For mixed content with elements, always indent text content
+                            const needsIndent = hasElementContent;
+                            const textContent = needsIndent ? "  ".repeat(indent + 1) + item : item;
+                            contentHtml.push(textContent);
+                        } else {
+                            const itemHtml = treeToHtml(item, indent + 1);
+                            if (itemHtml) {
+                                contentHtml.push(itemHtml);
+                            }
+                        }
+                    }
+                    
+                    if (hasTextContent && !hasElementContent) {
+                        // Only text content - inline
+                        result += contentHtml.join("");
+                    } else if (hasElementContent || hasTextContent) {
+                        // Has element content or mixed content - use newlines
+                        result += "\n" + contentHtml.join("\n") + "\n" + spaces;
                     }
                 }
                 
@@ -176,60 +373,40 @@ export function registerDomTools(server: McpServer) {
                 const htmlOutput = tree && !(tree as { error?: string }).error ? treeToHtml(tree).trim() : "";
                 if (tree && !(tree as { error?: string }).error) {
                     // Return HTML text directly
-                    return {
-                        content: [
-                            { type: "text", text: "DOM snapshot captured (HTML format)." },
-                            { type: "text", text: htmlOutput }
-                        ]
-                    };
+                    const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [
+                        { type: "text", text: "DOM snapshot captured (HTML format)." },
+                        { type: "text", text: htmlOutput }
+                    ];
+                    
+                    if (screenshot) {
+                        content.push({ type: "image", data: screenshot, mimeType: "image/png" });
+                    }
+                    
+                    return { content } as CallToolResult;
                 } else {
                     // Return error message
                     const errorMsg = (tree as { error?: string })?.error === "root-not-found" ? "DOM root not found." : "DOM snapshot returned no data.";
                     return {
                         content: [{ type: "text", text: errorMsg }]
-                    };
+                    } as CallToolResult;
                 }
             } else {
                 // JSON format (original behavior)
-                return mcpResult(
-                    { sessionId, rootSelector: rootSelector ?? null, format, tree },
+                const payload = { sessionId, rootSelector: rootSelector ?? null, format, tree };
+                const result = mcpResult(
+                    payload,
                     tree && !(tree as { error?: string }).error ? "DOM snapshot captured (JSON format)." :
                     (tree as { error?: string })?.error === "root-not-found" ? "DOM root not found." :
                     "DOM snapshot returned no data."
                 );
+                
+                // Add screenshot as image if included
+                if (screenshot && tree && !(tree as { error?: string }).error) {
+                    result.content.push({ type: "image", data: screenshot, mimeType: "image/png" });
+                }
+                
+                return result;
             }
-        }
-    );
-
-    server.tool(
-        "dom-execute",
-        "Execute custom JavaScript in the browser context. " +
-        "LLM: Use for advanced DOM manipulation, custom selectors, or exploring page state.",
-        {
-            sessionId: z
-                .string()
-                .min(1)
-                .describe("Existing WebDriver session id"),
-            script: z
-                .string()
-                .min(1)
-                .describe("JavaScript code to execute in browser context"),
-            args: z
-                .array(z.unknown())
-                .describe("Arguments to pass to the script (optional)")
-                .optional()
-                .default([])
-        },
-        async ({ sessionId, script, args = [] }) => {
-            const session = sessions.get(sessionId);
-            if (!session) throw new Error(`Session not found: ${sessionId}`);
-
-            const result = await session.executeScript(script, undefined, ...args);
-
-            return mcpResult(
-                { sessionId, script: script.substring(0, 200) + (script.length > 200 ? "..." : ""), result },
-                `Executed custom script (${script.length} chars)`
-            );
         }
     );
 
@@ -254,7 +431,7 @@ export function registerDomTools(server: McpServer) {
                 .max(100)
                 .default(10)
         },
-        async ({ sessionId, selector, limit = 10 }) => {
+        async ({ sessionId, selector, limit = 10 }): Promise<CallToolResult> => {
             const session = sessions.get(sessionId);
             if (!session) throw new Error(`Session not found: ${sessionId}`);
 
@@ -309,7 +486,7 @@ export function registerDomTools(server: McpServer) {
     );
 
     server.tool(
-        "dom-get-page-info",
+        "dom-page-info",
         "Get basic page information: title, URL, viewport size, and readyState. " +
         "LLM: Use to understand the current page context.",
         {
@@ -318,7 +495,7 @@ export function registerDomTools(server: McpServer) {
                 .min(1)
                 .describe("Existing WebDriver session id")
         },
-        async ({ sessionId }) => {
+        async ({ sessionId }): Promise<CallToolResult> => {
             const session = sessions.get(sessionId);
             if (!session) throw new Error(`Session not found: ${sessionId}`);
 
@@ -346,91 +523,6 @@ export function registerDomTools(server: McpServer) {
             return mcpResult(
                 { sessionId, pageInfo: info },
                 `Page: "${(info as any).title}" (${(info as any).readyState})`
-            );
-        }
-    );
-
-    server.tool(
-        "dom-wait-for-element",
-        "Wait for an element to appear using a CSS selector. " +
-        "LLM: Use when content loads dynamically or after interactions.",
-        {
-            sessionId: z
-                .string()
-                .min(1)
-                .describe("Existing WebDriver session id"),
-            selector: z
-                .string()
-                .min(1)
-                .describe("CSS selector to wait for"),
-            timeout: z
-                .number()
-                .describe("Timeout in milliseconds (default 10000)")
-                .int()
-                .min(100)
-                .max(60000)
-                .default(10000),
-            pollInterval: z
-                .number()
-                .describe("Poll interval in milliseconds (default 100)")
-                .int()
-                .min(50)
-                .max(1000)
-                .default(100)
-        },
-        async ({ sessionId, selector, timeout = 10000, pollInterval = 100 }) => {
-            const session = sessions.get(sessionId);
-            if (!session) throw new Error(`Session not found: ${sessionId}`);
-
-            const result = await session.executeScript(
-                `
-                return new Promise((resolve) => {
-                    const selector = arguments[0];
-                    const timeout = arguments[1] || 10000;
-                    const pollInterval = arguments[2] || 100;
-                    
-                    const startTime = Date.now();
-                    
-                    function check() {
-                        const element = document.querySelector(selector);
-                        if (element) {
-                            resolve({
-                                found: true,
-                                elapsedTime: Date.now() - startTime,
-                                element: {
-                                    tag: element.tagName ? element.tagName.toLowerCase() : "",
-                                    id: element.id || undefined,
-                                    classes: element.classList ? Array.from(element.classList) : [],
-                                    text: (element.innerText || element.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 100)
-                                }
-                            });
-                        } else if (Date.now() - startTime >= timeout) {
-                            resolve({
-                                found: false,
-                                elapsedTime: Date.now() - startTime,
-                                timeout: true
-                            });
-                        } else {
-                            setTimeout(check, pollInterval);
-                        }
-                    }
-                    
-                    check();
-                });
-                `,
-                undefined,
-                selector,
-                timeout,
-                pollInterval
-            );
-
-            const summary = (result as any).found 
-                ? `Element found after ${(result as any).elapsedTime}ms`
-                : `Element not found (timeout after ${(result as any).elapsedTime}ms)`;
-
-            return mcpResult(
-                { sessionId, selector, waitResult: result },
-                summary
             );
         }
     );

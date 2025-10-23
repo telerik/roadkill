@@ -204,6 +204,85 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
     );
 
     server.tool(
+        "webdriver-execute-script",
+        "Execute JavaScript synchronously in the browser context following WebDriver spec. " +
+        "The script should use 'arguments[0]', 'arguments[1]', etc. to access parameters and 'return' to return values. " +
+        "Do NOT use function() { ... } syntax - provide only the function body. " +
+        "Example: 'return document.title;' or 'var element = document.querySelector(arguments[0]); return element.textContent;'",
+        {
+            sessionId: z
+                .string()
+                .min(1)
+                .describe("Existing WebDriver session id"),
+            script: z
+                .string()
+                .min(1)
+                .describe("JavaScript function body (not wrapped in function() {...}). Use 'arguments[N]' to access parameters and 'return' for results."),
+            args: z
+                .array(z.unknown())
+                .describe("Arguments to pass to the script (optional). Accessible as arguments[0], arguments[1], etc.")
+                .optional()
+                .default([])
+        },
+        async ({ sessionId, script, args = [] }) => {
+            const session = sessions.get(sessionId);
+            if (!session) throw new Error(`Session not found: ${sessionId}`);
+
+            const result = await session.executeScript(script, undefined, ...args);
+
+            return mcpResult(
+                { 
+                    sessionId, 
+                    script: script.substring(0, 200) + (script.length > 200 ? "..." : ""), 
+                    args,
+                    result 
+                },
+                `Executed script (${script.length} chars) with ${args.length} arguments`
+            );
+        }
+    );
+
+    server.tool(
+        "webdriver-execute-script-async",
+        "Execute JavaScript asynchronously in the browser context following WebDriver spec. " +
+        "The script should use 'arguments[0]', 'arguments[1]', etc. to access parameters. " +
+        "The last argument is always a callback function - call it with your result: 'arguments[arguments.length-1](result);' " +
+        "Do NOT use function() { ... } syntax - provide only the function body. " +
+        "Example: 'setTimeout(function() { arguments[arguments.length-1](document.title); }, 1000);'",
+        {
+            sessionId: z
+                .string()
+                .min(1)
+                .describe("Existing WebDriver session id"),
+            script: z
+                .string()
+                .min(1)
+                .describe("JavaScript function body for async execution. Use 'arguments[N]' for parameters and call 'arguments[arguments.length-1](result)' when done."),
+            args: z
+                .array(z.unknown())
+                .describe("Arguments to pass to the script (optional). Last argument will always be the callback function.")
+                .optional()
+                .default([])
+        },
+        async ({ sessionId, script, args = [] }) => {
+            const session = sessions.get(sessionId);
+            if (!session) throw new Error(`Session not found: ${sessionId}`);
+
+            const result = await session.executeScriptAsync(script, undefined, ...args);
+
+            return mcpResult(
+                { 
+                    sessionId, 
+                    script: script.substring(0, 200) + (script.length > 200 ? "..." : ""), 
+                    args,
+                    result 
+                },
+                `Executed async script (${script.length} chars) with ${args.length} arguments`
+            );
+        }
+    );
+
+    server.tool(
         "webdriver-close-session",
         "Dispose (delete) a WebDriver session. " +
         "LLM: Always close sessions you created when done to keep the environment clean.",
