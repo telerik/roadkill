@@ -1,8 +1,8 @@
-import { describe, test } from "@jest/globals";
+import { describe, test, beforeAll, afterAll } from "vitest";
 import { Builder, Browser, WebDriver } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
 import { sleep } from "@progress/roadkill/utils.js";
-import { Session, WebDriverClient } from "@progress/roadkill/webdriver.js";
+import { Session, WebDriverClient, type MatchingCapabilities } from "@progress/roadkill/webdriver.js";
 
 describe("w3schools", () => {
 
@@ -18,14 +18,17 @@ describe("w3schools", () => {
             .forBrowser(Browser.CHROME)
             .build();
 
+        // When session is constructed in beforeAll, manual disposal is required
         session = new Session(
             new WebDriverClient({ address: `http://localhost:${port}` }),
                 (await driver.getSession()).getId(),
-                (await driver.getSession()).getCapabilities() as any);
+                (await driver.getSession()).getCapabilities() as unknown as MatchingCapabilities);
 
     }, 30000);
 
     afterAll(async () => {
+        // Manual disposal required when constructed in beforeAll
+        await session?.[Symbol.asyncDispose]();
         await driver?.quit();
     });
 

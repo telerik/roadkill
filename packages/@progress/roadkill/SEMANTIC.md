@@ -4,10 +4,53 @@
 
 * Discovered in the **browser** via a pure `static find()` (one round-trip).
 * Hydrated into classes with **readonly properties** (captured by `find()`).
-* Arranged in a **tree** by **DOM containment** using each object’s anchor **element**.
+* Arranged in a **tree** by **DOM containment** using each object's anchor **element**.
 * Used with **methods for interactions** (click/type) and **properties for assertions**.
 
 The workflow is: **discover → hydrate → assert → (optionally) interact**.
+
+---
+
+## Resource Management
+
+Semantic Objects work with both resource management patterns:
+
+### Per-Test Automatic Cleanup (Recommended)
+```typescript
+import { describe, it } from "vitest";
+import { WebDriverClient } from "@progress/roadkill";
+
+describe("semantic tests", () => {
+  it("uses automatic cleanup", async () => {
+    await using client = new WebDriverClient("http://localhost:4444");
+    await using session = await client.session({ browserName: "chrome" });
+    
+    const objects = await session.find([LoginForm, UserCard]);
+    // Automatic disposal when test completes
+  });
+});
+```
+
+### Suite-Level Manual Cleanup (When Needed)
+```typescript
+describe("semantic suite", () => {
+  let session: Session;
+  
+  beforeAll(async () => {
+    const client = new WebDriverClient("http://localhost:4444");
+    session = await client.session({ browserName: "chrome" });
+  });
+  
+  afterAll(async () => {
+    await session?.[Symbol.asyncDispose](); // ECMAScript 2024 disposal
+  });
+  
+  it("reuses session", async () => {
+    const objects = await session.find([LoginForm]);
+    // Session cleanup handled in afterAll
+  });
+});
+```
 
 ---
 
@@ -170,4 +213,4 @@ export type DTOOf<C extends { find: (...args: any[]) => any }> = AnnotatedDTO<El
 
 ---
 
-Happy testing! 🎯
+Happy testing!

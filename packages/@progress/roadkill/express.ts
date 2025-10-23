@@ -18,8 +18,8 @@ export interface ExpressOptions extends ServerOptions {
     /** Additional PATH entries (prepended). */
     pathPrepend?: string[];
 
-    /** Fallback port if no address is parsed. Defaults to 3000. */
-    defaultPort?: number;
+    /** Port to run the server on. Defaults to 3000. */
+    port?: number;
 
     /** Regex to detect readiness in stdout. */
     readinessRegex?: RegExp;
@@ -43,12 +43,16 @@ export class Express extends Server<ExpressOptions> {
             cwd = process.cwd(),
             env,
             pathPrepend = [],
-            defaultPort = 3000,
+            port = 3000,
             command,
             args,
         } = this.options;
 
-        const childEnv: NodeJS.ProcessEnv = { ...process.env, ...env };
+        const childEnv: NodeJS.ProcessEnv = { 
+            ...process.env, 
+            ...env,
+            PORT: String(port)
+        };
         if (pathPrepend.length) {
             const currentPath = process.env.PATH ?? "";
             childEnv.PATH = `${pathPrepend.join(delimiter)}${delimiter}${currentPath}`;
@@ -60,7 +64,7 @@ export class Express extends Server<ExpressOptions> {
             shell: true,
         };
 
-        this._address = `http://localhost:${defaultPort}`;
+        this._address = `http://localhost:${port}`;
         return spawn(command, args, spawnOpts);
     }
 
@@ -103,8 +107,8 @@ export class Express extends Server<ExpressOptions> {
         return {
             command: "node",
             args: ["--experimental-strip-types", "--no-warnings", entry],
-            defaultPort: 3000,
             ...opts,
+            port: opts.port ?? 3000,
         };
     }
 
@@ -112,8 +116,8 @@ export class Express extends Server<ExpressOptions> {
         return {
             command: "npm",
             args: ["start", "--silent"],
-            defaultPort: 3000,
             ...opts,
+            port: opts.port ?? 3000,
         };
     }
 
@@ -121,8 +125,8 @@ export class Express extends Server<ExpressOptions> {
         return {
             command,
             args,
-            defaultPort: 3000,
             ...opts,
+            port: opts.port ?? 3000,
         };
     }
 }

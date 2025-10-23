@@ -4,14 +4,14 @@ type FinderSrc = { name: string; src: string };
 
 class Registry {
     private readonly list: FinderSrc[] = [];
-    private readonly ctors = new Map<string, SemanticCtor<any>>();
-    register(ctor: SemanticCtor<any>) {
+    private readonly ctors = new Map<string, SemanticCtor<SemanticObject>>();
+    register(ctor: SemanticCtor<SemanticObject>) {
         const name = ctor?.name;
-        const fn = (ctor as any)?.find;
+        const fn = (ctor as SemanticCtor<SemanticObject>)?.find;
         if (!name || typeof fn !== "function") {
             throw new Error(`@semantic: ${name || "<anonymous>"} must declare a static find() function`);
         }
-        (ctor as any).semanticClass = name;
+        (ctor as SemanticCtor<SemanticObject>).semanticClass = name;
         this.list.push({ name, src: fn.toString() });
         this.ctors.set(name, ctor);
     }
@@ -21,8 +21,8 @@ class Registry {
 const registry = new Registry();
 
 export function semantic() {
-    return function <T extends new (...args: any[]) => any>(ctor: T) {
-        registry.register(ctor as unknown as SemanticCtor<any>);
+    return function <T extends SemanticCtor<SemanticObject>>(ctor: T): T {
+        registry.register(ctor);
         return ctor;
     };
 }
@@ -34,7 +34,7 @@ export class SemanticObject {
     public element?: WebDriverElement | null;
     constructor(public readonly session?: Session) { }
 
-    childrenOfType<T extends SemanticObject>(ctor: new (...args: any[]) => T): T[] {
+    childrenOfType<T extends SemanticObject>(ctor: new (session?: Session) => T): T[] {
         return this.children.filter(c => c instanceof ctor) as T[];
     }
 
@@ -100,8 +100,8 @@ export class SemanticObject {
 export class Root extends SemanticObject { }
 
 export interface SemanticCtor<T extends SemanticObject> {
-    new(session: Session): T;
-    semanticClass: string;
+    new(session?: Session): T;
+    semanticClass?: string;
     find(): Array<{ element: globalThis.Element;[k: string]: any }>;
 }
 
@@ -117,7 +117,8 @@ export type DTO<T extends object = {}> = { element: globalThis.Element } & T;
 
 export type AnnotatedDTO<T> = HydrateElements<T> & {
     ["$semantic-class"]: string;
-    children?: Array<AnnotatedDTO<any>>;
+    element?: globalThis.Element;
+    children?: Array<AnnotatedDTO<unknown>>;
 };
 
 export type DTOOf<C extends { find: (...args: any[]) => any }> =
@@ -187,7 +188,14 @@ export function buildDiscoverScript(): string {
     const finders: { name: string, find: Function }[] = undefined;
     script += `\n// finder functions array\nconst finders = [\n`;
     for (let finder of getFinders()) {
-        script += `{\n  name: ${JSON.stringify(finder.name)},\n  ${finder.src}\n},`;
+        // Clean up the function source to remove module import references
+        let cleanSrc = finder.src;
+        // Replace any __vite_ssr_import_X__.findElementsByCss with just findElementsByCss
+        cleanSrc = cleanSrc.replace(/__vite_ssr_import_\d+__\.findElementsByCss/g, 'findElementsByCss');
+        // Replace any other module import patterns that might appear
+        cleanSrc = cleanSrc.replace(/__vite_ssr_import_\d+__\./g, '');
+        
+        script += `{\n  name: ${JSON.stringify(finder.name)},\n  ${cleanSrc}\n},`;
     }
     script += `];\n`;
 
@@ -230,7 +238,7 @@ export function buildDiscoverScript(): string {
 }
 
 /** Hydrate a DTO forest (from browser) into a Root tree. */
-export function hydrate(session: Session, dtoRoots: Array<AnnotatedDTO<any>>): Root {
+export function hydrate(session: Session, dtoRoots: Array<AnnotatedDTO<unknown>>): Root {
     const root = new Root(session);
 
     const RESERVED = new Set(["children", "element", "$semantic-class"]);
@@ -248,12 +256,13 @@ export function hydrate(session: Session, dtoRoots: Array<AnnotatedDTO<any>>): R
         }
     }
 
-    function makeNode(dto: AnnotatedDTO<any>): SemanticObject {
+    function makeNode(dto: AnnotatedDTO<unknown>): SemanticObject {
         const ctor = registry.ctorOf(dto["$semantic-class"]);
         const inst = ctor ? new ctor(session) : new SemanticObject(session);
 
-        (inst as any).element = (dto as any).element ?? null;   // attach WD element
-        definePropsFromDto(inst, dto as any);                   // copy DTO props
+        // @ts-ignore: attach DOM element - type conflict between globalThis.Element and WebDriver Element
+        inst.element = dto.element ?? null;
+        definePropsFromDto(inst, dto as Record<string, unknown>);                   // copy DTO props
 
         const kids = dto.children || [];
         for (const child of kids) inst.children.push(makeNode(child));
@@ -266,7 +275,13 @@ export function hydrate(session: Session, dtoRoots: Array<AnnotatedDTO<any>>): R
 
 /** Discover: build → execute → hydrate (no debug logging). */
 export async function discover(session: Session): Promise<Root> {
-    return hydrate(session, await session.executeScript(buildDiscoverScript()));
+    try {
+        const script = buildDiscoverScript();
+        const result = await session.executeScript(script);
+        return hydrate(session, result as Array<AnnotatedDTO<unknown>>);
+    } catch (error) {
+        throw error;
+    }
 }
 
 /** Browser-side helper, re-exported for user finders. */

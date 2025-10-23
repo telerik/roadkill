@@ -4,7 +4,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 
 import { ChromeDriver } from "./chromedriver.js";
-import { WebDriverClient, Session, Element } from "./webdriver.js";
+import { WebDriverClient, Session, Element, ElementLookup } from "./webdriver.js";
 
 import { readFile } from "fs/promises";
 import { dirname, join } from "path";
@@ -56,8 +56,8 @@ async function runDriver(): Promise<ChromeDriver> {
                             reject(new Error(`ChromeDriver failed to start (state: ${s}).`));
                         }
                     };
-                    const cleanup = () => driver.off("state", onState as any);
-                    driver.on("state", onState as any);
+                    const cleanup = () => driver.off("state", onState);
+                    driver.on("state", onState);
                 }).finally(() => { driverWait = null; });
             }
             return driverWait;
@@ -128,7 +128,7 @@ server.tool(
     {
         name: z.string().describe("User name to greet")
     },
-    async ({ name }) => mcpResult({ hello: name }, `Hello, ${name}! 👋`)
+    async ({ name }) => mcpResult({ hello: name }, `Hello, ${name}!`)
 );
 
 // ── webdriver.startSession ─────────────────────────────────
@@ -149,7 +149,7 @@ server.tool(
         const wd = new WebDriverClient({
             enableLogging: true,
             // If your WebDriverClientOptions lacks `log`, keep the cast:
-            log: console.error as any,
+            log: console.error,
             address,
             logPrefix: "[WebDriver]"
         });
@@ -323,8 +323,8 @@ server.tool(
 
         return mcpResult(
             { sessionId, rootSelector: rootSelector ?? null, tree },
-            tree && !tree.error ? "DOM snapshot captured." :
-            tree?.error === "root-not-found" ? "DOM root not found." :
+            tree && !(tree as { error?: string }).error ? "DOM snapshot captured." :
+            (tree as { error?: string })?.error === "root-not-found" ? "DOM root not found." :
             "DOM snapshot returned no data."
         );
     }
@@ -356,7 +356,7 @@ server.tool(
         }
 
         // Call WebDriver as-is
-        const found = await session.findElements({ using, value } as any);
+        const found = await session.findElements({ using, value } as ElementLookup);
 
         // Return only elementIds (minimal); easy to compose with clickElement later.
         const elements = found.map(el => ({ elementId: el.elementId }));
@@ -416,7 +416,7 @@ server.tool(
     async ({ sessionId }) => {
         const session = sessions.get(sessionId);
         if (!session) throw new Error(`Session not found: ${sessionId}`);
-        await session.dispose();
+        await session[Symbol.asyncDispose]();
         sessions.delete(sessionId);
         return mcpResult({ sessionId, closed: true }, `Closed session ${sessionId}`);
     }
@@ -548,24 +548,34 @@ const transport = new StdioServerTransport();
 transport.onclose = async () => {
     try {
         for (const [id, s] of sessions) {
-            try { await s.dispose(); } catch {}
+            try { await s[Symbol.asyncDispose](); } catch {}
             sessions.delete(id);
         }
-        await driver?.dispose();
+        await driver?.[Symbol.asyncDispose]();
+    } catch {}
+};
+
+const cleanUp = async () => {
+    try {
+        for (const [id, s] of sessions) {
+            try { await s[Symbol.asyncDispose](); } catch {}
+            sessions.delete(id);
+        }
+        await driver?.[Symbol.asyncDispose]();
     } catch {}
 };
 
 process.on("SIGINT", async () => {
     try {
-        for (const [id, s] of sessions) { try { await s.dispose(); } catch {} sessions.delete(id); }
-        await driver?.dispose();
+        for (const [id, s] of sessions) { try { await s[Symbol.asyncDispose](); } catch {} sessions.delete(id); }
+        await driver?.[Symbol.asyncDispose]();
     } finally { process.exit(0); }
 });
 
 process.on("SIGTERM", async () => {
     try {
-        for (const [id, s] of sessions) { try { await s.dispose(); } catch {} sessions.delete(id); }
-        await driver?.dispose();
+        for (const [id, s] of sessions) { try { await s[Symbol.asyncDispose](); } catch {} sessions.delete(id); }
+        await driver?.[Symbol.asyncDispose]();
     } finally { process.exit(0); }
 });
 

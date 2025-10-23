@@ -1,10 +1,10 @@
 // index.semantic.test.ts
-import { describe, test, expect, beforeAll, afterAll, afterEach, beforeEach } from "@jest/globals";
+import { describe, test, expect, beforeAll, afterAll, afterEach, beforeEach } from "vitest";
 import { mkdir, writeFile } from "fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Express } from "@progress/roadkill/express.js";
-import { getState, step } from "@progress/roadkill/utils.js";
+import { step } from "@progress/roadkill/utils.js";
 import { ChromeDriver } from "@progress/roadkill/chromedriver.js";
 import { Session, WebDriverClient, type Element as WebDriverElement } from "@progress/roadkill/webdriver.js";
 import { semantic, discover, SemanticObject, Root, findElementsByCss, FindByCSSFields } from "@progress/roadkill/semantic.js";
@@ -108,24 +108,23 @@ class TopicCard extends SemanticObject {
     }
 }
 
-describe("test-website (semantic objects)", () => {
+describe.sequential("test-website (semantic objects)", () => {
     let chromedriver: ChromeDriver;
     let express: Express;
     let webdriver: WebDriverClient;
     let session: Session;
 
     beforeAll(async () => {
-        const { signal } = getState();
-
         express = new Express(
-            Express.npmStart({ cwd: dirname(fileURLToPath(import.meta.url)), enableLogging }),
+            Express.npmStart({ cwd: dirname(fileURLToPath(import.meta.url)), enableLogging, port: 3002 }),
         );
-        await express.start(signal);
+        await express.start();
 
         chromedriver = new ChromeDriver({ args: ["--port=5033"], enableLogging });
-        await chromedriver.start(signal);
+        await chromedriver.start();
 
         webdriver = new WebDriverClient({ address: chromedriver.address!, enableLogging });
+        
         session = await webdriver.newSession({
             capabilities: { timeouts: { implicit: 2000 } },
         });
@@ -135,23 +134,13 @@ describe("test-website (semantic objects)", () => {
         await session.setTimeouts({ implicit: 2000 });
     });
 
-    afterEach(async () => {
-        const { test } = getState();
-        if (test && test.status === "fail") {
-            const screenshot = await session.takeScreenshot();
-            const dir = `dist/test/${expect.getState().currentTestName}-semantic`;
-            await mkdir(dir, { recursive: true });
-            await writeFile(join(dir, "screenshot.png"), screenshot, { encoding: "base64" });
-        }
-    });
-
     afterAll(async () => {
-        await session?.dispose();
-        await chromedriver?.dispose();
-        await express?.dispose();
+        await session?.[Symbol.asyncDispose]();
+        await chromedriver?.[Symbol.asyncDispose]();
+        await express?.[Symbol.asyncDispose]();
     }, 20000);
 
-    test.only("login + topics using semantic objects", async () => {
+    test("login + topics using semantic objects", async () => {
 
         await step("navigate to local test site", () =>
             session.navigateTo(express.address!)
@@ -225,8 +214,8 @@ describe("test-website (semantic objects)", () => {
                     <TocPage cardCount={5} subtitleText="Targetable summary cards for QA flows." titleText="Roadkill – Topics">
                         <TopicCard description="Standalone server implementing the WebDriver protocol for Chromium browsers. Roadkill manages lifecycle, logs, and startup detection." href="https://chromedriver.chromium.org/" title="ChromeDriver" />
                         <TopicCard description="The W3C-standard browser automation protocol. Roadkill stays close to spec with typed commands and helpful errors." href="https://www.w3.org/TR/webdriver2/" title="WebDriver" />
-                        <TopicCard description="Higher-level DOM discovery helpers that make selectors readable, robust, and LLM-friendly." href="http://localhost:3000/toc#semantic-objects" title="Semantic Objects" />
-                        <TopicCard description="Checks Chrome/Node/ChromeDriver versions, manages drivers, and streamlines CI/dev workflows." href="http://localhost:3000/toc#roadkill-cli" title="Roadkill CLI" />
+                        <TopicCard description="Higher-level DOM discovery helpers that make selectors readable, robust, and LLM-friendly." href="http://localhost:3002/toc#semantic-objects" title="Semantic Objects" />
+                        <TopicCard description="Checks Chrome/Node/ChromeDriver versions, manages drivers, and streamlines CI/dev workflows." href="http://localhost:3002/toc#roadkill-cli" title="Roadkill CLI" />
                         <TopicCard description="Expose Roadkill via the Model Context Protocol so LLMs can inspect pages and iteratively author tests." href="https://modelcontextprotocol.io/" title="MCP Integration" />
                     </TocPage>
                 </Root>);
@@ -237,8 +226,8 @@ describe("test-website (semantic objects)", () => {
     <TocPage cardCount="5" subtitleText="Targetable summary cards for QA flows." titleText="Roadkill – Topics">
         <TopicCard description="Standalone server implementing the WebDriver protocol for Chromium browsers. Roadkill manages lifecycle, logs, and startup detection." href="https://chromedriver.chromium.org/" title="ChromeDriver"/>
         <TopicCard description="The W3C-standard browser automation protocol. Roadkill stays close to spec with typed commands and helpful errors." href="https://www.w3.org/TR/webdriver2/" title="WebDriver"/>
-        <TopicCard description="Higher-level DOM discovery helpers that make selectors readable, robust, and LLM-friendly." href="http://localhost:3000/toc#semantic-objects" title="Semantic Objects"/>
-        <TopicCard description="Checks Chrome/Node/ChromeDriver versions, manages drivers, and streamlines CI/dev workflows." href="http://localhost:3000/toc#roadkill-cli" title="Roadkill CLI"/>
+        <TopicCard description="Higher-level DOM discovery helpers that make selectors readable, robust, and LLM-friendly." href="http://localhost:3002/toc#semantic-objects" title="Semantic Objects"/>
+        <TopicCard description="Checks Chrome/Node/ChromeDriver versions, manages drivers, and streamlines CI/dev workflows." href="http://localhost:3002/toc#roadkill-cli" title="Roadkill CLI"/>
         <TopicCard description="Expose Roadkill via the Model Context Protocol so LLMs can inspect pages and iteratively author tests." href="https://modelcontextprotocol.io/" title="MCP Integration"/>
     </TocPage>
 </Root>`
@@ -247,7 +236,7 @@ describe("test-website (semantic objects)", () => {
 
         await step("screenshot topics page", async () => {
             const screenshot = await session.takeScreenshot();
-            const dir = `dist/test/${expect.getState().currentTestName}-semantic`;
+            const dir = `dist/test/semantic-screenshot`;
             await mkdir(dir, { recursive: true });
             await writeFile(join(dir, "screenshot.png"), screenshot, { encoding: "base64" });
         });

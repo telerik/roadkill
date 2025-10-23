@@ -1,4 +1,5 @@
 import { SemanticObject } from "./semantic.js";
+import type { Session } from "./webdriver.js";
 
 /**
  * Classic JSX factory:
@@ -25,7 +26,7 @@ export namespace SemanticJSX {
     }
 
     export function createElement(
-        type: new () => SemanticObject,
+        type: new (session?: Session) => SemanticObject,
         props: Record<string, unknown> | null,
         ...children: unknown[]
     ): SemanticObject {
@@ -33,7 +34,7 @@ export namespace SemanticJSX {
 
         if (props) definePropsFromRecord(node, props);
 
-        (node as any).children = children
+        (node as SemanticObject & { children: SemanticObject[] }).children = children
             .flat()
             .filter((c): c is SemanticObject => c instanceof SemanticObject);
 
@@ -54,12 +55,12 @@ type ExcludedKeys = "element" | "session" | "children";
 type AllowedKeysOf<T> = {
     [K in keyof T]-?:
     K extends ExcludedKeys ? never :
-    T[K] extends (...args: any[]) => any ? never :
+    T[K] extends (...args: unknown[]) => unknown ? never :
     AllowedValue<T[K]> extends never ? never : K
 }[keyof T];
 
 type PropsOf<C> =
-    C extends new (...args: any[]) => any
+    C extends new (session?: Session) => SemanticObject
     ? Partial<Pick<InstanceType<C>, AllowedKeysOf<InstanceType<C>>>>
     : never;
 
@@ -73,7 +74,7 @@ declare global {
         interface ElementChildrenAttribute { children: {}; }
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         type LibraryManagedAttributes<C, P> =
-            C extends new (...args: any[]) => SemanticObject
+            C extends new (session?: Session) => SemanticObject
             ? WithChildren<PropsOf<C>>
             : P;
     }
@@ -92,7 +93,7 @@ function isPrimitiveArray(v: unknown): v is PrimitiveArray {
 
 function pickSerializableProps(node: SemanticObject): Record<string, unknown> {
     const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(node as any)) {
+    for (const [k, v] of Object.entries(node as unknown as Record<string, unknown>)) {
         if (k === "children" || k === "element" || k === "session") continue;
         if (v == null) { out[k] = v; continue; }
         const t = typeof v;
@@ -105,7 +106,7 @@ function pickSerializableProps(node: SemanticObject): Record<string, unknown> {
 }
 
 function classNameOf(node: SemanticObject): string {
-    return (node as any)?.constructor?.name || "<Unknown>";
+    return (node as unknown as { constructor?: { name?: string } })?.constructor?.name || "<Unknown>";
 }
 
 function diffProps(path: string, a: Record<string, unknown>, b: Record<string, unknown>): string[] {

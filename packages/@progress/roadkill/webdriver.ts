@@ -1,4 +1,14 @@
-import { withImplicitSignal, type Disposable } from "./utils.js";
+/**
+ * ECMAScript Explicit Resource Management (ES2024)
+ * Requires Node.js 22+ for Symbol.dispose support
+ */
+
+// Type declaration for AbortSignal.any (Node.js 22+)
+declare global {
+    interface AbortSignalConstructor {
+        any(signals: AbortSignal[]): AbortSignal;
+    }
+}
 
 /**
  * [6.6 Errors](https://www.w3.org/TR/webdriver2/#errors)
@@ -8,7 +18,7 @@ export interface ErrorResult {
         error: string;
         message: string;
         stacktrace: string;
-        data?: any;
+        data?: unknown;
     }
 }
 
@@ -119,7 +129,7 @@ export interface ValidateCapabilities {
      * or
      * The key of an extension capability
      */
-    [key: `${string}:${string}`]: any
+    [key: `${string}:${string}`]: unknown
 };
 
 /**
@@ -154,7 +164,7 @@ export interface MatchingCapabilities {
     /**
      * Optionally add extension capabilities as entries to matched capabilities.
      */
-    [key: string]: any,
+    [key: string]: unknown,
 }
 
 /**
@@ -459,8 +469,8 @@ export enum UnhandledPromptBehavior {
 export type Method = "GET" | "POST" | "DELETE";
 
 export interface Serializer {
-    serialize?(value: any): any;
-    deserialize?(value: any): any;
+    serialize?(value: unknown): unknown;
+    deserialize?(value: unknown): unknown;
 }
 
 export interface WebDriverClientOptions {
@@ -477,18 +487,16 @@ export interface WebDriverClientOptions {
 // Helpers for safe JSON (de)serialization
 function withReplacer(serializer?: Serializer) {
     return typeof serializer?.serialize === "function"
-        ? (_k: string, v: any) => serializer!.serialize!(v)
+        ? (_k: string, v: unknown) => serializer!.serialize!(v)
         : undefined;
 }
 function withReviver(serializer?: Serializer) {
     return typeof serializer?.deserialize === "function"
-        ? (_k: string, v: any) => serializer!.deserialize!(v)
+        ? (_k: string, v: unknown) => serializer!.deserialize!(v)
         : undefined;
 }
 
 export class WebDriverClient {
-
-    public useImplicitSignal = true;
 
     public constructor(public readonly options: WebDriverClientOptions, public readonly fetchImplementation: typeof fetch = fetch) {
     }
@@ -497,6 +505,41 @@ export class WebDriverClient {
 
     protected log(line: string) {
         if (this.options?.enableLogging) (this.options.log ?? console.log)(`${this.prefix ? this.prefix + " " : ""}${line}`);
+    }
+
+    /**
+     * Protected virtual method for signal handling that can be overridden in context-aware instances.
+     * @param signal The signal to process
+     * @returns The processed signal or undefined
+     */
+    protected withSignal(signal?: AbortSignal): AbortSignal | undefined {
+        return signal;
+    }
+
+    /**
+     * Creates a context-aware WebDriverClient that combines signals from the context with method calls.
+     * @param context The context containing a signal to be combined with method calls
+     * @returns A new WebDriverClient instance that automatically combines signals
+     */
+    public context<T extends WebDriverClient>(this: T, context: { signal?: AbortSignal }): T {
+        const originalClient = this;
+        
+        // Create a new object with the same prototype chain
+        const contextClient = Object.create(Object.getPrototypeOf(this));
+        
+        // Override the withSignal method to combine signals
+        contextClient.withSignal = function(signal?: AbortSignal): AbortSignal | undefined {
+            const baseSignal = originalClient.withSignal.call(this, signal);
+            
+            if (baseSignal && context.signal) {
+                // Combine both signals using AbortSignal.any (Node.js 22+)
+                return AbortSignal.any([baseSignal, context.signal]);
+            }
+            
+            return context.signal ?? baseSignal;
+        };
+        
+        return contextClient as T;
     }
 
     /**
@@ -519,7 +562,7 @@ export class WebDriverClient {
      * 8.3 Status
      * https://www.w3.org/TR/webdriver2/#status
      */
-    public async status(signal?: AbortSignal): Promise<{ ready: boolean, message: string, [other: string]: any }> {
+    public async status(signal?: AbortSignal): Promise<{ ready: boolean, message: string, [other: string]: unknown }> {
         try {
             return await this.request<{}, { ready: boolean, message: string }>("GET", "/status", undefined, signal);
         } catch (cause) {
@@ -531,7 +574,7 @@ export class WebDriverClient {
         try {
             const headers: Record<string, string> = { "Accept": "application/json" };
             const requestInit: RequestInit = { method, headers };
-            signal = withImplicitSignal(signal, this.useImplicitSignal);
+            signal = this.withSignal(signal);
             if (signal) requestInit.signal = signal;
             if (args !== undefined) {
                 headers["Content-Type"] = "application/json; charset=utf-8";
@@ -560,7 +603,7 @@ export class WebDriverClient {
 
             if (!text) return undefined as unknown as Result;
 
-            let json: any;
+            let json: unknown;
             try {
                 json = JSON.parse(text, withReviver(serializer));
             } catch {
@@ -600,35 +643,89 @@ export interface PrintOptions {
     pageRanges?: (number | `${number}` | `${number}-${number}`)[];
 }
 
-export class Session implements Disposable, Serializer {
+export class Session implements Disposable, AsyncDisposable, Serializer {
 
     public constructor(public readonly wdAddress: WebDriverClient, public readonly sessionId: string, public readonly capabilities: MatchingCapabilities) {
     }
 
     protected request<Args, Result>(method: Method, uri: string, args?: Args, signal?: AbortSignal): Promise<Result> {
-        return this.wdAddress.request<Args, Result>(method, uri, args, signal, this).catch(error => {
+        return this.wdAddress.request<Args, Result>(method, uri, args, this.withSignal(signal), this).catch(error => {
             error["sessionId"] = this.sessionId;
             throw error;
         });
     }
 
-    public serialize(value: any): any {
+    /**
+     * Protected virtual method for signal handling that can be overridden in context-aware instances.
+     * @param signal The signal to process
+     * @returns The processed signal or undefined
+     */
+    protected withSignal(signal?: AbortSignal): AbortSignal | undefined {
+        return signal;
+    }
+
+    public serialize(value: unknown): unknown {
         if (value instanceof Element) return { [webElementIdentifier]: value[webElementIdentifier] };
         if (value instanceof ShadowRoot) return { [shadowRootIdentifier]: value[shadowRootIdentifier] };
         return value;
     }
 
-    public deserialize(value: any): any {
-        if (value && typeof value === "object" && webElementIdentifier in value) return this.element(value);
-        if (value && typeof value === "object" && shadowRootIdentifier in value) return this.shadowRoot(value);
+    public deserialize(value: unknown): unknown {
+        if (value && typeof value === "object" && webElementIdentifier in value) return this.element(value as WebElementReference);
+        if (value && typeof value === "object" && shadowRootIdentifier in value) return this.shadowRoot(value as ShadowRootReference);
         return value;
     }
 
     /**
-     * [8.2 Delete Session](https://www.w3.org/TR/webdriver2/#delete-session)
+     * Creates a context-aware Session that combines signals from the context with method calls.
+     * @param context The context containing a signal to be combined with method calls
+     * @returns A new Session instance that automatically combines signals
      */
-    public dispose(signal?: AbortSignal): Promise<void> {
-        return this.request("DELETE", `/session/${this.sessionId}`, undefined, signal);
+    public context<T extends Session>(this: T, context: { signal?: AbortSignal }): T {
+        const originalSession = this;
+        
+        // Create a new object with the same prototype chain - no property copying
+        const contextSession = Object.create(Object.getPrototypeOf(this));
+        
+        // Copy constructor properties
+        contextSession.wdAddress = this.wdAddress;
+        contextSession.sessionId = this.sessionId;
+        contextSession.capabilities = this.capabilities;
+        
+        // Override the withSignal method to combine signals
+        contextSession.withSignal = function(signal?: AbortSignal): AbortSignal | undefined {
+            const baseSignal = originalSession.withSignal.call(this, signal);
+            
+            if (baseSignal && context.signal) {
+                // Combine both signals using AbortSignal.any (Node.js 22+)
+                return AbortSignal.any([baseSignal, context.signal]);
+            }
+            return context.signal ?? baseSignal;
+        };
+        
+        return contextSession as T;
+    }
+
+    /**
+     * [8.2 Delete Session](https://www.w3.org/TR/webdriver2/#delete-session)
+     * 
+     * ECMAScript Explicit Resource Management implementation
+     */
+    public [Symbol.dispose](): void {
+        // For sync disposal, we can't await the async dispose
+        // Users should prefer using `await using` with Symbol.asyncDispose
+        this.request("DELETE", `/session/${this.sessionId}`, undefined).catch(() => {
+            // Silently handle disposal errors in sync context
+        });
+    }
+
+    /**
+     * [8.2 Delete Session](https://www.w3.org/TR/webdriver2/#delete-session)
+     * 
+     * ECMAScript Async Explicit Resource Management implementation
+     */
+    public async [Symbol.asyncDispose](): Promise<void> {
+        await this.request("DELETE", `/session/${this.sessionId}`, undefined);
     }
 
     /**
@@ -900,7 +997,7 @@ export class Session implements Disposable, Serializer {
     /**
      * [13.2.1 Execute Script](https://www.w3.org/TR/webdriver2/#execute-script)
      */
-    public async executeScript(script: string, signal?: AbortSignal, ...args: any[]): Promise<any> {
+    public async executeScript(script: string, signal?: AbortSignal, ...args: unknown[]): Promise<unknown> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/execute/sync`, { script, args }, signal);
         } catch (cause) {
@@ -911,7 +1008,7 @@ export class Session implements Disposable, Serializer {
     /**
      * [13.2.2 Execute Async Script](https://www.w3.org/TR/webdriver2/#execute-async-script)
      */
-    public async executeScriptAsync(script: string, signal?: AbortSignal, ...args: any[]): Promise<any> {
+    public async executeScriptAsync(script: string, signal?: AbortSignal, ...args: unknown[]): Promise<unknown> {
         try {
             return await this.request("POST", `/session/${this.sessionId}/execute/async`, { script, args }, signal);
         } catch (cause) {
@@ -1206,9 +1303,9 @@ export class Element implements WebElementReference {
     /**
      * [12.4.3 Get Element Property](https://www.w3.org/TR/webdriver2/#get-element-property)
      */
-    public async getProperty(name: string, signal?: AbortSignal): Promise<any> {
+    public async getProperty(name: string, signal?: AbortSignal): Promise<unknown> {
         try {
-            return await this.request<{}, any>("GET", `/session/${this.sessionId}/element/${this.elementId}/property/${name}`, undefined, signal);
+            return await this.request<{}, unknown>("GET", `/session/${this.sessionId}/element/${this.elementId}/property/${name}`, undefined, signal);
         } catch (cause) {
             throw new WebDriverMethodError(`Failed to get property ${name} from element.`, { cause }, { name });
         }

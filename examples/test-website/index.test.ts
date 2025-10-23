@@ -1,31 +1,30 @@
 import { ChromeDriver } from "@progress/roadkill/chromedriver.js";
 import { Express } from "@progress/roadkill/express.js";
 import { Session, WebDriverClient, by } from "@progress/roadkill/webdriver.js";
-import { describe, test, expect, beforeAll, afterAll, afterEach, beforeEach } from "@jest/globals";
-import { getState, step } from "@progress/roadkill/utils.js";
+import { describe, test, expect, beforeAll, afterAll, afterEach, beforeEach } from "vitest";
+import { step } from "@progress/roadkill/utils.js";
 import { mkdir, writeFile } from "fs/promises";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const enableLogging = false;
 
-describe("test-website", () => {
+describe.sequential("test-website", () => {
     let chromedriver: ChromeDriver;
     let express: Express;
     let webdriver: WebDriverClient;
     let session: Session;
 
     beforeAll(async () => {
-        const { signal } = getState();
-
         express = new Express(
-            Express.npmStart({ cwd: dirname(fileURLToPath(import.meta.url)), enableLogging }),
+            Express.npmStart({ cwd: dirname(fileURLToPath(import.meta.url)), enableLogging, port: 3000 }),
         );
-        await express.start(signal);
+        await express.start();
 
         chromedriver = new ChromeDriver({ args: ["--port=5032"], enableLogging });
-        await chromedriver.start(signal);
+        await chromedriver.start();
 
+        // When constructed in beforeAll, manual disposal is required
         webdriver = new WebDriverClient({ address: chromedriver.address!, enableLogging });
         session = await webdriver.newSession({
             capabilities: { timeouts: { implicit: 2000 } },
@@ -38,25 +37,18 @@ describe("test-website", () => {
     });
 
     afterEach(async () => {
-        const { test } = getState();
-        if (test && test.status === "fail") {
-            console.log("collecting failure artifacts for:", test.names.join(" > "));
-            const screenshot = await session.takeScreenshot();
-            const dir = `dist/test/${expect.getState().currentTestName}`;
-            await mkdir(dir, { recursive: true });
-            await writeFile(join(dir, "screenshot.png"), screenshot, { encoding: "base64" });
-        }
+        // Test failure handling can be added here if needed
+        // Vitest provides test context differently than Jest
     });
 
     afterAll(async () => {
-        await session?.dispose();
-        await chromedriver?.dispose();
-        await express?.dispose();
+        // Manual disposal required when constructed in beforeAll
+        await session?.[Symbol.asyncDispose]();
+        await chromedriver?.[Symbol.asyncDispose]();
+        await express?.[Symbol.asyncDispose]();
     }, 20000);
 
     test("login flow", async () => {
-        const { signal } = getState();
-
         await step("navigate to local test site", () =>
             session.navigateTo(express.address!)
         );
@@ -105,9 +97,9 @@ describe("test-website", () => {
 
         await step("capture and save screenshot", async () => {
             const screenshot = await session.takeScreenshot();
-            const dir = `dist/test/${expect.getState().currentTestName}`;
+            const dir = `dist/test/login-flow`;
             await mkdir(dir, { recursive: true });
-            await writeFile(join(dir, "screenshot.png"), screenshot, { encoding: "base64", signal });
+            await writeFile(join(dir, "screenshot.png"), screenshot, { encoding: "base64" });
         });
 
     }, 30000);

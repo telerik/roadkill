@@ -1,18 +1,17 @@
 {
-  "name": "selenium-interop",
+  "name": "vitest-web",
   "version": "0.1.4",
-  "description": "",
+  "description": "Example using vitest and roadkill",
   "type": "module",
   "private": "true",
   "scripts": {
     "test": "vitest run"
   },
-  "author": "",
-  "license": "MIT",
   "devDependencies": {
     "@progress/roadkill": "^0.2.4",
-    "@types/selenium-webdriver": "^4.1.18",
-    "selenium-webdriver": "^4.21.0",
+    "@types/node": "^20.8.2",
+    "typescript": "^5.2.2",
     "vitest": "^3.2.0"
-  }
+  },
+  "license": "MIT"
 }
