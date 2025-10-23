@@ -37,7 +37,7 @@ async function readSiblingModuleBase(nameNoExt: "webdriver" | "chromedriver" | "
  */
 export function registerReferenceTools(server: McpServer) {
     server.tool(
-        "reference.api",
+        "reference-api",
         "Read the shipped Roadkill framework source file for reference. " +
         "LLM: Use this to understand available WebDriver/ChromeDriver/Semantic APIs when authoring tests.",
         {
@@ -55,7 +55,7 @@ export function registerReferenceTools(server: McpServer) {
     );
 
     server.tool(
-        "reference.example",
+        "reference-example",
         "Return a minimal Vitest project (package.json, tsconfig.json, example.test.ts) using Roadkill's ChromeDriver + WebDriverClient. " +
         "LLM: Use as a template and fill in selectors you discovered via the DOM and semantic tools.",
         {},

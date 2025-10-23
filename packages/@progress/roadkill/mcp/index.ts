@@ -20,17 +20,6 @@ const server = new McpServer({
         "Generate portable tests using the framework tools."
 });
 
-server.tool("hello", "Greets back the user! Useful for probing the MCP pipeline.", {
-    name: z.string().describe("User name to greet")
-}, async ({ name }) => {
-    const payload = { hello: name };
-    const summary = `Hello, ${name}!`;
-    const parts: Array<{ type: "text"; text: string }> = [];
-    if (summary) parts.push({ type: "text", text: summary });
-    parts.push({ type: "text", text: JSON.stringify(payload) });
-    return { content: parts };
-});
-
 // Reference tools (API docs and examples)
 registerReferenceTools(server);
 

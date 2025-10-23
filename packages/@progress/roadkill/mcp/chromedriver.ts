@@ -100,7 +100,7 @@ export function getDriverAddress(): string | null {
 export function registerChromeDriverTools(server: McpServer) {
 
     server.tool(
-        "chromedriver.status",
+        "chromedriver-status",
         "Report ChromeDriver state/address. " +
         "LLM: Use this to diagnose driver availability if a session fails to start.",
         {},
@@ -113,7 +113,7 @@ export function registerChromeDriverTools(server: McpServer) {
     );
 
     server.tool(
-        "chromedriver.start",
+        "chromedriver-start",
         "Start ChromeDriver service if not already running. " +
         "LLM: Use this before creating WebDriver sessions if ChromeDriver is not running. " +
         "Optionally specify a custom port (default: 9515).",
@@ -131,7 +131,7 @@ export function registerChromeDriverTools(server: McpServer) {
     );
 
     server.tool(
-        "chromedriver.stop",
+        "chromedriver-stop",
         "Stop ChromeDriver service. " +
         "LLM: Use this when you're completely done to clean up resources.",
         {},
@@ -153,7 +153,7 @@ export function registerChromeDriverTools(server: McpServer) {
     );
 
     server.tool(
-        "chromedriver.restart",
+        "chromedriver-restart",
         "Restart ChromeDriver service (stop then start). " +
         "LLM: Use this if ChromeDriver gets into a bad state. " +
         "Optionally specify a custom port (default: keeps current port or 9515).",

@@ -24,7 +24,7 @@ export const sessions = new Map<string, Session>();
 export function registerWebDriverTools(server: McpServer, getDriverAddress: () => string | null) {
 
     server.tool(
-        "webdriver.startSession",
+        "webdriver-start-session",
         "Start a WebDriver session and return a sessionId. " +
         "LLM: Always call this first to obtain a session id before navigation or DOM exploration.",
         {
@@ -66,7 +66,7 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
     );
 
     server.tool(
-        "webdriver.navigate",
+        "webdriver-navigate",
         "Navigate an existing session to a URL. " +
         "LLM: Use this immediately after starting a session and whenever you need a new page. Reuse the same sessionId.",
         {
@@ -92,7 +92,7 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
     );
 
     server.tool(
-        "webdriver.findElements",
+        "webdriver-find-elements",
         "Direct WebDriver lookup using the standard locator strategies. " +
         "Pass { using, value } exactly per the spec: 'css selector' | 'link text' | 'partial link text' | 'tag name' | 'xpath'. " +
         "Returns elementIds for any matches.",
@@ -136,7 +136,7 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
     );
 
     server.tool(
-        "webdriver.clickElement",
+        "webdriver-click-element",
         "Click an element by WebDriver element id within a session. " +
         "LLM: Typically obtain elementId from webdriver.findElements when unique==true.",
         {
@@ -159,7 +159,7 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
     );
 
     server.tool(
-        "webdriver.sendKeys",
+        "webdriver-send-keys",
         "Send keystrokes to an element by WebDriver element id within a session.",
         {
             sessionId: z
@@ -184,7 +184,7 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
     );
 
     server.tool(
-        "webdriver.takeScreenshot",
+        "webdriver-take-screenshot",
         "Take a screenshot of the current page in a session.",
         {
             sessionId: z
@@ -204,7 +204,7 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
     );
 
     server.tool(
-        "webdriver.closeSession",
+        "webdriver-close-session",
         "Dispose (delete) a WebDriver session. " +
         "LLM: Always close sessions you created when done to keep the environment clean.",
         {

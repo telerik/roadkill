@@ -18,8 +18,8 @@ function mcpResult<T>(payload: T, summary?: string) {
 export function registerDomTools(server: McpServer) {
 
     server.tool(
-        "dom.snapshot",
-        "Return a trimmed DOM tree (tag, id, classes, role, aria-*, type, href, text). " +
+        "dom-snapshot",
+        "Return a complete DOM tree (tag, id, classes, role, aria-*, type, href, text). " +
         "LLM: Use to understand page structure and propose stable selectors. Prefer id/role/unique text.",
         {
             sessionId: z
@@ -30,29 +30,12 @@ export function registerDomTools(server: McpServer) {
                 .string()
                 .describe("Optional CSS selector for sub-tree root; defaults to document.body")
                 .optional(),
-            maxDepth: z
-                .number()
-                .describe("Max depth to traverse (default 64)")
-                .int()
-                .min(0)
-                .max(255)
-                .default(64),
-            maxChildren: z
-                .number()
-                .describe("Max direct children per node (default 64)")
-                .int()
-                .min(1)
-                .max(255)
-                .default(64),
-            maxTextLen: z
-                .number()
-                .describe("Max characters of normalized text captured per node (default 120)")
-                .int()
-                .min(0)
-                .max(2000)
-                .default(120)
+            format: z
+                .enum(["html", "json"])
+                .describe("Output format (default: html)")
+                .default("html")
         },
-        async ({ sessionId, rootSelector, maxDepth = 64, maxChildren = 64, maxTextLen = 120 }) => {
+        async ({ sessionId, rootSelector, format = "html" }) => {
             const session = sessions.get(sessionId);
             if (!session) throw new Error(`Session not found: ${sessionId}`);
 
@@ -61,15 +44,12 @@ export function registerDomTools(server: McpServer) {
                 return (function() {
                     const opts = arguments[0] || {};
                     const selector = opts.rootSelector;
-                    const maxDepth = Number.isFinite(opts.maxDepth) ? opts.maxDepth : 64;
-                    const maxChildren = Number.isFinite(opts.maxChildren) ? opts.maxChildren : 64;
-                    const maxTextLen = Number.isFinite(opts.maxTextLen) ? opts.maxTextLen : 120;
 
                     const root = selector ? document.querySelector(selector) : document.body;
                     if (!root) return { error: "root-not-found", selector };
 
                     const ELEMENT_NODE = 1;
-                    const norm = s => (s ?? "").replace(/\\s+/g, " ").trim();
+                    const norm = s => (s ?? "").replace(/\\s+/g, " ").replace(/^\\s+|\\s+$/g, "");
 
                     function nodeTypeTag(el) { return el.tagName ? el.tagName.toLowerCase() : ""; }
                     function nodeTypeAttr(el, tag) {
@@ -80,13 +60,11 @@ export function registerDomTools(server: McpServer) {
                     function nodeHref(el, tag) { return (tag === "a" && el.href) ? String(el.href) : undefined; }
                     function nodeText(el) {
                         const raw = (el.innerText ?? el.textContent ?? "");
-                        const txt = norm(raw);
-                        return maxTextLen > 0 ? txt.slice(0, maxTextLen) : txt;
+                        return norm(raw);
                     }
 
                     function snap(el, depth) {
                         if (!el || (el.nodeType || 0) !== ELEMENT_NODE) return null;
-                        if (depth > maxDepth) return null;
 
                         const tag = nodeTypeTag(el);
                         const id = el.id || undefined;
@@ -105,7 +83,7 @@ export function registerDomTools(server: McpServer) {
 
                         const kids = [];
                         const children = el.children ? Array.from(el.children) : [];
-                        for (let i = 0; i < children.length && i < maxChildren; i++) {
+                        for (let i = 0; i < children.length; i++) {
                             const child = snap(children[i], depth + 1);
                             if (child) kids.push(child);
                         }
@@ -121,20 +99,110 @@ export function registerDomTools(server: McpServer) {
                 })();
                 `,
                 undefined,
-                { rootSelector, maxDepth, maxChildren, maxTextLen }
+                { rootSelector }
             );
 
-            return mcpResult(
-                { sessionId, rootSelector: rootSelector ?? null, tree },
-                tree && !(tree as { error?: string }).error ? "DOM snapshot captured." :
-                (tree as { error?: string })?.error === "root-not-found" ? "DOM root not found." :
-                "DOM snapshot returned no data."
-            );
+            // Convert tree to HTML format if requested
+            function treeToHtml(node: any, indent = 0): string {
+                if (!node) return "";
+                
+                const spaces = "  ".repeat(indent);
+                const tag = node.tag || "unknown";
+                
+                // Build attributes string
+                const attrs = [];
+                if (node.id) attrs.push(`id="${node.id}"`);
+                if (node.classes && node.classes.length > 0) attrs.push(`class="${node.classes.join(" ")}"`);
+                if (node.role) attrs.push(`role="${node.role}"`);
+                if (node.type) attrs.push(`type="${node.type}"`);
+                if (node.href) attrs.push(`href="${node.href}"`);
+                
+                // Add aria attributes
+                if (node.aria) {
+                    for (const [key, value] of Object.entries(node.aria)) {
+                        attrs.push(`${key}="${value}"`);
+                    }
+                }
+                
+                const attrStr = attrs.length > 0 ? " " + attrs.join(" ") : "";
+                
+                // Handle self-closing tags
+                const voidTags = new Set(['area', 'base', 'br', 'col', 'embed', 'hr', 'img', 'input', 'link', 'meta', 'source', 'track', 'wbr']);
+                
+                if (voidTags.has(tag)) {
+                    return `${spaces}<${tag}${attrStr}>`;
+                }
+                
+                const hasText = node.text && node.text.length > 0;
+                const hasChildren = node.children && node.children.length > 0;
+                
+                // Handle empty tags (no text, no children) as self-closing
+                if (!hasText && !hasChildren) {
+                    return `${spaces}<${tag}${attrStr}/>`;
+                }
+                
+                // Build opening tag
+                let result = `${spaces}<${tag}${attrStr}>`;
+                
+                // Add text content if present
+                if (hasText) {
+                    result += node.text;
+                }
+                
+                // Add children if present
+                if (hasChildren) {
+                    const childrenHtml = [];
+                    for (const child of node.children) {
+                        const childHtml = treeToHtml(child, indent + 1);
+                        if (childHtml) {
+                            childrenHtml.push(childHtml);
+                        }
+                    }
+                    
+                    if (childrenHtml.length > 0) {
+                        // Add single newline before children (whether we have text or not)
+                        result += "\n" + childrenHtml.join("\n") + "\n" + spaces;
+                    }
+                }
+                
+                // Add closing tag
+                result += `</${tag}>`;
+                
+                return result;
+            }
+
+            // Return appropriate format
+            if (format === "html") {
+                const htmlOutput = tree && !(tree as { error?: string }).error ? treeToHtml(tree).trim() : "";
+                if (tree && !(tree as { error?: string }).error) {
+                    // Return HTML text directly
+                    return {
+                        content: [
+                            { type: "text", text: "DOM snapshot captured (HTML format)." },
+                            { type: "text", text: htmlOutput }
+                        ]
+                    };
+                } else {
+                    // Return error message
+                    const errorMsg = (tree as { error?: string })?.error === "root-not-found" ? "DOM root not found." : "DOM snapshot returned no data.";
+                    return {
+                        content: [{ type: "text", text: errorMsg }]
+                    };
+                }
+            } else {
+                // JSON format (original behavior)
+                return mcpResult(
+                    { sessionId, rootSelector: rootSelector ?? null, format, tree },
+                    tree && !(tree as { error?: string }).error ? "DOM snapshot captured (JSON format)." :
+                    (tree as { error?: string })?.error === "root-not-found" ? "DOM root not found." :
+                    "DOM snapshot returned no data."
+                );
+            }
         }
     );
 
     server.tool(
-        "dom.execute",
+        "dom-execute",
         "Execute custom JavaScript in the browser context. " +
         "LLM: Use for advanced DOM manipulation, custom selectors, or exploring page state.",
         {
@@ -166,7 +234,7 @@ export function registerDomTools(server: McpServer) {
     );
 
     server.tool(
-        "dom.testSelector",
+        "dom-test-selector",
         "Test a CSS selector and return matching element info without creating WebDriver elements. " +
         "LLM: Use to validate selectors before using them in webdriver.findElements.",
         {
@@ -203,7 +271,7 @@ export function registerDomTools(server: McpServer) {
                             tag: el.tagName ? el.tagName.toLowerCase() : "",
                             id: el.id || undefined,
                             classes: el.classList ? Array.from(el.classList) : [],
-                            text: (el.innerText || el.textContent || "").replace(/\\s+/g, " ").trim().slice(0, 100),
+                            text: (el.innerText || el.textContent || "").replace(/\\s+/g, " ").replace(/^\\s+|\\s+$/g, "").slice(0, 100),
                             attributes: el.hasAttributes ? Array.from(el.attributes).reduce((acc, attr) => {
                                 acc[attr.name] = attr.value;
                                 return acc;
@@ -241,7 +309,7 @@ export function registerDomTools(server: McpServer) {
     );
 
     server.tool(
-        "dom.getPageInfo",
+        "dom-get-page-info",
         "Get basic page information: title, URL, viewport size, and readyState. " +
         "LLM: Use to understand the current page context.",
         {
@@ -283,7 +351,7 @@ export function registerDomTools(server: McpServer) {
     );
 
     server.tool(
-        "dom.waitForElement",
+        "dom-wait-for-element",
         "Wait for an element to appear using a CSS selector. " +
         "LLM: Use when content loads dynamically or after interactions.",
         {
