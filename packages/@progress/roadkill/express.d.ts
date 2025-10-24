@@ -1,5 +1,5 @@
 import { type ChildProcessWithoutNullStreams } from "child_process";
-import { Server, type ServerOptions } from "./server.js";
+import { Server, type ServerOptions } from "./server";
 export interface ExpressOptions extends ServerOptions {
     /** Working directory for the process. Defaults to process.cwd(). */
     cwd?: string;

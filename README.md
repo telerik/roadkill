@@ -30,6 +30,18 @@ A [WebDriver](https://www.w3.org/TR/webdriver2/) based slim testing framework. C
  - **Node.js 22+ Required** - Cutting-edge JavaScript runtime features
  - **Zero Backward Compatibility** - Clean slate approach
 
+## AI-Powered DOM Analysis
+
+Roadkill includes advanced DOM snapshot capabilities designed for AI assistants like GitHub Copilot. The `dom-snapshot` and `dom-test-selector` tools provide comprehensive page structure analysis to help craft robust selectors:
+
+- **`dom-snapshot`**: Captures complete DOM structure with element positioning, visibility states, and semantic information
+- **`dom-test-selector`**: Tests CSS/XPath selectors and shows element hierarchy with matches, parents, and children
+- **AI Integration**: Optimized for Copilot to understand page layout and suggest stable, maintainable selectors
+- **Intelligent Filtering**: Automatically excludes non-essential elements (style, script tags) for cleaner analysis
+- **Multiple Formats**: Supports both HTML and JSON output formats for different AI processing needs
+
+**Note**: Large HTML pages may trigger chat summarization in AI assistants due to content length limits. For complex pages, consider using specific root selectors to focus analysis on relevant sections.
+
 ## Demo
 To run the demo code, clone the repo, execute the ***[./packages/@progress/roadkill/example.ts](./packages/@progress/roadkill/example.ts)*** by running:
 ```

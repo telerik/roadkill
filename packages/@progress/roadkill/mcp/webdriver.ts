@@ -1,6 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { WebDriverClient, Session, Element, ElementLookup } from "../webdriver.js";
+import { runDriver, getDriverAddress } from "./chromedriver.js";
 
 /**
  * Return both a readable summary and a machine-parseable JSON payload.
@@ -21,7 +22,7 @@ export const sessions = new Map<string, Session>();
 /**
  * Register vanilla WebDriver API tools with the MCP server
  */
-export function registerWebDriverTools(server: McpServer, getDriverAddress: () => string | null) {
+export function registerWebDriverTools(server: McpServer, getDriverAddress?: () => string | null) {
 
     server.tool(
         "webdriver-start-session",
@@ -67,27 +68,88 @@ export function registerWebDriverTools(server: McpServer, getDriverAddress: () =
 
     server.tool(
         "webdriver-navigate",
-        "Navigate an existing session to a URL. " +
-        "LLM: Use this immediately after starting a session and whenever you need a new page. Reuse the same sessionId.",
+        "Navigate to a URL. If sessionId is provided, uses existing session. " +
+        "If sessionId is omitted, this is a utility shortcut that starts ChromeDriver, creates a session, and navigates - " +
+        "compressing the common 'start chromedriver' + 'start session' + 'navigate' workflow. " +
+        "LLM: Use with sessionId for existing sessions, or without for quick one-step navigation.",
         {
-            sessionId: z
-                .string()
-                .min(1)
-                .describe("Existing WebDriver session id"),
             url: z
                 .string()
                 .url()
-                .describe("Absolute URL to navigate to (e.g., https://example.com)")
+                .describe("Absolute URL to navigate to (e.g., https://example.com)"),
+            sessionId: z
+                .string()
+                .min(1)
+                .describe("Existing WebDriver session id (optional - if omitted, will start ChromeDriver and create new session)")
+                .optional(),
+            browserName: z
+                .string()
+                .describe("Target browser name when creating new session (e.g., 'chrome'). Ignored if sessionId provided.")
+                .default("chrome")
+                .optional(),
+            port: z
+                .number()
+                .int()
+                .min(1024)
+                .max(65535)
+                .describe("ChromeDriver port when starting new session. Ignored if sessionId provided.")
+                .default(9515)
+                .optional()
         },
-        async ({ sessionId, url }) => {
-            const session = sessions.get(sessionId);
-            if (!session) throw new Error(`Session not found: ${sessionId}`);
+        async ({ url, sessionId, browserName = "chrome", port = 9515 }) => {
+            let session: Session;
+            let isNewSession = false;
+            let chromeDriverPort: number | undefined;
+
+            if (sessionId) {
+                // Use existing session
+                session = sessions.get(sessionId);
+                if (!session) throw new Error(`Session not found: ${sessionId}`);
+            } else {
+                // Utility shortcut: start ChromeDriver + create session + navigate
+                isNewSession = true;
+                chromeDriverPort = port;
+
+                // Start ChromeDriver
+                const driver = await runDriver(port);
+                const address = String(driver.address);
+
+                // Create WebDriver client and new session
+                const wd = new WebDriverClient({
+                    enableLogging: true,
+                    log: console.error,
+                    address,
+                    logPrefix: "[WebDriver]"
+                });
+
+                session = await wd.newSession({
+                    capabilities: { browserName }
+                });
+
+                sessions.set(session.sessionId, session);
+                sessionId = session.sessionId;
+            }
+
+            // Navigate to URL
             await session.navigateTo(url);
             const current = await session.getCurrentUrl().catch(() => undefined);
-            return mcpResult(
-                { sessionId, url, currentUrl: current ?? url },
-                `Navigated ${sessionId} - ${url}`
-            );
+
+            const payload = {
+                sessionId: sessionId!,
+                url,
+                currentUrl: current ?? url,
+                ...(isNewSession && {
+                    newSession: true,
+                    chromeDriverPort,
+                    capabilities: session.capabilities
+                })
+            };
+
+            const summary = isNewSession
+                ? `Started ChromeDriver (port ${chromeDriverPort}), created session ${sessionId}, and navigated to ${url}`
+                : `Navigated ${sessionId} - ${url}`;
+
+            return mcpResult(payload, summary);
         }
     );
 

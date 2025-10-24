@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from "child_process";
 import { delimiter } from "node:path";
-import { Server, type ServerOptions } from "./server.js";
+import { Server, type ServerOptions } from "./server";
 
 export interface ExpressOptions extends ServerOptions {
     /** Working directory for the process. Defaults to process.cwd(). */

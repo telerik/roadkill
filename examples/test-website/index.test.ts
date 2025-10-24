@@ -1,6 +1,6 @@
-import { ChromeDriver } from "@progress/roadkill/chromedriver.js";
-import { Express } from "@progress/roadkill/express.js";
-import { Session, WebDriverClient, by } from "@progress/roadkill/webdriver.js";
+import { ChromeDriver } from "@progress/roadkill";
+import { Express } from "@progress/roadkill";
+import { Session, WebDriverClient, by } from "@progress/roadkill";
 import { describe, test, expect, beforeAll, afterAll, afterEach, beforeEach } from "vitest";
 import { mkdir, writeFile } from "fs/promises";
 import { join, dirname } from "node:path";

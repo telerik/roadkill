@@ -1,5 +1,5 @@
-import { SemanticObject } from "./semantic.js";
-import type { Session } from "./webdriver.js";
+import { SemanticObject } from "./semantic";
+import type { Session } from "./webdriver";
 
 /**
  * Classic JSX factory:

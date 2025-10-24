@@ -52,158 +52,42 @@ type DomToken = string | ElementToken;
 type DomSnapshotResult = ElementToken;
 
 /**
- * Shared DOM element processing utilities that can be used by both dom-snapshot and dom-test-selector
+ * Result from selector testing operations
  */
-function createDomProcessingUtils() {
-    const ELEMENT_NODE = 1;
-    const TEXT_NODE = 3;
-    const norm = (s: any) => (s ?? "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
-
-    function nodeTypeTag(el: any) { return el.tagName ? el.tagName.toLowerCase() : ""; }
-    function nodeElementType(el: any, tag: string) {
-        if (tag === "button" && el.type) return String(el.type);
-        if (tag === "input"  && el.type) return String(el.type);
-        return undefined;
-    }
-    function nodeHref(el: any, tag: string) { return (tag === "a" && el.href) ? String(el.href) : undefined; }
-
-    function snapElement(el: any, matchedElements?: Set<any>): ElementToken {
-        const tag = nodeTypeTag(el);
-        const id = el.id || undefined;
-        const classes = el.classList ? Array.from(el.classList).map(String) : [];
-        const role = el.getAttribute && el.getAttribute("role") || undefined;
-        const elementType = nodeElementType(el, tag);
-        const href = nodeHref(el, tag);
-        const isMatch = matchedElements ? matchedElements.has(el) : undefined;
-
-        // Get element frame (bounding box) and visibility
-        let frame: [number, number, number, number] | undefined = undefined;
-        let hidden: boolean | undefined = undefined;
-        try {
-            // Check if element is intentionally hidden (not just layout/structural)
-            const computedStyle = window.getComputedStyle && window.getComputedStyle(el);
-            
-            // Elements that are structurally invisible but not "hidden" content
-            const structuralElements = new Set(['br', 'hr', 'wbr', 'area', 'base', 'col', 'colgroup', 'embed', 'link', 'meta', 'source', 'track', 'param']);
-            const isStructural = structuralElements.has(tag);
-            
-            // Check if any parent is intentionally hidden by CSS
-            const isParentHidden = (function() {
-                let parent = el.parentElement;
-                while (parent && parent !== document.body) {
-                    const parentStyle = window.getComputedStyle && window.getComputedStyle(parent);
-                    if (parentStyle && (
-                        parentStyle.display === "none" ||
-                        parentStyle.visibility === "hidden" ||
-                        parseFloat(parentStyle.opacity || "1") === 0
-                    )) {
-                        return true;
-                    }
-                    parent = parent.parentElement;
-                }
-                return false;
-            })();
-            
-            // Check for intentional hiding via CSS properties only
-            const hasDisplayNone = computedStyle && computedStyle.display === "none";
-            const hasVisibilityHidden = computedStyle && computedStyle.visibility === "hidden";
-            const hasZeroOpacity = computedStyle && parseFloat(computedStyle.opacity || "1") === 0;
-            
-            // Determine if element is intentionally hidden - only consider CSS properties, not HTML hidden attribute
-            const isIntentionallyHidden = 
-                hasDisplayNone ||
-                hasVisibilityHidden ||
-                hasZeroOpacity ||
-                isParentHidden ||
-                (el.offsetParent === null && !isStructural && computedStyle && computedStyle.position !== "fixed");
-
-            if (isIntentionallyHidden) {
-                hidden = true;
-            } else {
-                const rect = el.getBoundingClientRect();
-                if (rect) {
-                    const x = Math.round(rect.left + window.scrollX);
-                    const y = Math.round(rect.top + window.scrollY);
-                    const width = Math.round(rect.width);
-                    const height = Math.round(rect.height);
-                    frame = [x, y, width, height];
-                }
-            }
-        } catch (e) {
-            // getBoundingClientRect might fail on some elements
-        }
-
-        const aria: any = {};
-        if (el.hasAttributes && el.hasAttributes()) {
-            for (const a of Array.from(el.attributes)) {
-                if ((a as any).name && (a as any).name.startsWith("aria-")) {
-                    aria[(a as any).name] = (a as any).value;
-                }
-            }
-        }
-
-        // Process child nodes (including text nodes and elements)
-        const content: DomToken[] = [];
-        const childNodes = el.childNodes ? Array.from(el.childNodes) : [];
-        
-        for (const child of childNodes) {
-            const node = child as any;
-            if (node.nodeType === TEXT_NODE) {
-                const text = norm(node.textContent || "");
-                if (text) {
-                    content.push(text);
-                }
-            } else if (node.nodeType === ELEMENT_NODE) {
-                const childElement = snapElement(node, matchedElements);
-                if (childElement) {
-                    // Filter out structural elements with no meaningful properties
-                    const childTag = childElement.element;
-                    const structuralElements = new Set(['br', 'hr', 'wbr', 'area', 'base', 'col', 'colgroup', 'embed', 'link', 'meta', 'source', 'track', 'param']);
-                    const isStructural = structuralElements.has(childTag);
-                    
-                    if (isStructural) {
-                        // Only include structural elements if they have meaningful properties
-                        const hasProperties = childElement.id || 
-                                            (childElement.classes && childElement.classes.length > 0) || 
-                                            childElement.role || 
-                                            childElement.type || 
-                                            childElement.href || 
-                                            (childElement.aria && Object.keys(childElement.aria).length > 0) ||
-                                            (childElement.content && childElement.content.length > 0);
-                        
-                        if (hasProperties) {
-                            content.push(childElement);
-                        }
-                    } else {
-                        content.push(childElement);
-                    }
-                }
-            }
-        }
-
-        return {
-            element: tag,
-            id,
-            classes: classes.length ? classes : undefined,
-            role,
-            type: elementType,
-            href,
-            aria: Object.keys(aria).length ? aria : undefined,
-            frame,
-            hidden,
-            match: isMatch,
-            content: content.length ? content : undefined
-        };
-    }
-
-    return { snapElement, ELEMENT_NODE, TEXT_NODE, norm };
+interface SelectorTestResult {
+    selector: string;
+    selectorType: 'css' | 'xpath';
+    matchCount: number;
+    matches: Array<{
+        elementId: string;
+        tag: string;
+        id?: string;
+        classes: string[];
+        text: string;
+        xpath: string;
+        attributes: Record<string, string>;
+    }>;
+    hierarchy: ElementToken | null;
 }
+
+/**
+ * Error result from DOM operations
+ */
+interface DomErrorResult {
+    error: string;
+    selector?: string;
+}
+
+/**
+ * Union type for all possible DOM processing results
+ */
+type DomProcessingResult = DomSnapshotResult | SelectorTestResult | DomErrorResult;
 
 /**
  * Generic DOM processing script that handles both snapshot and selector testing
  * Always returns JSON - formatting to HTML happens on the Node.js side
  */
-function domProcessingScript(): any {
+function domProcessingScript(): DomProcessingResult {
     // Parse arguments
     const opts = arguments[0] || {};
     const selectorText = arguments[1]; // CSS or XPath selector for testing
@@ -213,6 +97,9 @@ function domProcessingScript(): any {
     const ELEMENT_NODE = 1;
     const TEXT_NODE = 3;
     const norm = (s: any) => (s ?? "").replace(/\s+/g, " ").replace(/^\s+|\s+$/g, "");
+    
+    // Define filtered elements once at the top level
+    const filteredElements = new Set(["script", "style", "def", "defs"]);
 
     function nodeTypeTag(el: any) { return el.tagName ? el.tagName.toLowerCase() : ""; }
     function nodeElementType(el: any, tag: string) {
@@ -224,6 +111,12 @@ function domProcessingScript(): any {
 
     function snapElement(el: any, matchedElements?: Set<any>): any {
         const tag = nodeTypeTag(el);
+        
+        // Skip filtered elements entirely
+        if (filteredElements.has(tag)) {
+            return null;
+        }
+        
         const id = el.id || undefined;
         const classes = el.classList ? Array.from(el.classList).map(String) : [];
         const role = el.getAttribute && el.getAttribute("role") || undefined;
@@ -260,24 +153,60 @@ function domProcessingScript(): any {
             const hasVisibilityHidden = computedStyle && computedStyle.visibility === "hidden";
             const hasZeroOpacity = computedStyle && parseFloat(computedStyle.opacity || "1") === 0;
             
+            // Check for invisible transforms (scale of 0 in any dimension)
+            let hasInvisibleTransform = false;
+            if (computedStyle && computedStyle.transform && computedStyle.transform !== 'none') {
+                const transform = computedStyle.transform;
+                // Matrix format: matrix(a, b, c, d, e, f) where a=scaleX, d=scaleY
+                const matrixMatch = transform.match(/matrix\(([^)]+)\)/);
+                if (matrixMatch) {
+                    const values = matrixMatch[1].split(',').map(v => parseFloat(v.trim()));
+                    if (values.length >= 6) {
+                        const scaleX = values[0];
+                        const scaleY = values[3];
+                        hasInvisibleTransform = scaleX === 0 || scaleY === 0;
+                    }
+                }
+                
+                // Check for scale3d
+                const scale3dMatch = transform.match(/scale3d\(([^)]+)\)/);
+                if (scale3dMatch) {
+                    const values = scale3dMatch[1].split(',').map(v => parseFloat(v.trim()));
+                    if (values.length >= 3) {
+                        const scaleX = values[0];
+                        const scaleY = values[1];
+                        hasInvisibleTransform = scaleX === 0 || scaleY === 0;
+                    }
+                }
+                
+                // Check for individual scale transforms
+                if (transform.includes('scaleX(0)') || transform.includes('scaleY(0)') || transform.includes('scale(0')) {
+                    hasInvisibleTransform = true;
+                }
+            }
+            
             const isIntentionallyHidden = 
                 hasDisplayNone ||
                 hasVisibilityHidden ||
                 hasZeroOpacity ||
+                hasInvisibleTransform ||
                 isParentHidden ||
                 (el.offsetParent === null && !isStructural && computedStyle && computedStyle.position !== "fixed");
 
+            // Set hidden flag independently of frame calculation
             if (isIntentionallyHidden) {
                 hidden = true;
-            } else {
-                const rect = el.getBoundingClientRect();
-                if (rect) {
-                    const x = Math.round(rect.left + window.scrollX);
-                    const y = Math.round(rect.top + window.scrollY);
-                    const width = Math.round(rect.width);
-                    const height = Math.round(rect.height);
-                    frame = [x, y, width, height];
-                }
+            }
+
+            // Always try to get frame coordinates, regardless of hidden status
+            // Some hidden elements (like visibility:hidden) still have layout dimensions
+            const rect = el.getBoundingClientRect();
+            if (rect && (rect.width > 0 || rect.height > 0)) {
+                const x = Math.round(rect.left + window.scrollX);
+                const y = Math.round(rect.top + window.scrollY);
+                const width = Math.round(rect.width);
+                const height = Math.round(rect.height);
+                frame = [x, y, width, height];
             }
         } catch (e) {
             // getBoundingClientRect might fail on some elements
@@ -303,9 +232,15 @@ function domProcessingScript(): any {
                     content.push(text);
                 }
             } else if (node.nodeType === ELEMENT_NODE) {
+                const childTag = nodeTypeTag(node);
+                
+                // Skip filtered elements entirely
+                if (filteredElements.has(childTag)) {
+                    continue;
+                }
+                
                 const childElement = snapElement(node, matchedElements);
                 if (childElement) {
-                    const childTag = childElement.element;
                     const structuralElements = new Set(['br', 'hr', 'wbr', 'area', 'base', 'col', 'colgroup', 'embed', 'link', 'meta', 'source', 'track', 'param']);
                     const isStructural = structuralElements.has(childTag);
                     
@@ -330,16 +265,16 @@ function domProcessingScript(): any {
 
         return {
             element: tag,
-            id,
-            classes: classes.length ? classes : undefined,
-            role,
-            type: elementType,
-            href,
-            aria: Object.keys(aria).length ? aria : undefined,
-            frame,
-            hidden,
-            match: isMatch,
-            content: content.length ? content : undefined
+            ...(id ? { id } : {}),
+            ...(classes.length ? { classes } : {}),
+            ...(role ? { role } : {}),
+            ...(elementType ? { type: elementType } : {}),
+            ...(href ? { href } : {}),
+            ...(Object.keys(aria).length ? { aria } : {}),
+            ...(frame ? { frame } : {}),
+            ...(hidden ? { hidden } : {}),
+            ...(isMatch ? { match: isMatch } : {}),
+            ...(content.length ? { content } : {})
         };
     }
 
@@ -574,7 +509,7 @@ function mcpResult<T>(payload: T, summary?: string): CallToolResult {
 /**
  * Convert DOM element tree to HTML string representation
  */
-function treeToHtml(node: any, indent = 0): string {
+function treeToHtml(node: DomToken | null | undefined, indent = 0): string {
     if (!node) return "";
     
     // Handle text nodes (now just strings)
@@ -595,8 +530,8 @@ function treeToHtml(node: any, indent = 0): string {
     if (node.frame) {
         attrs.push(`frame="${node.frame.join(" ")}"`);
     }
-    // Only show hidden if element is actually CSS-hidden (not just HTML hidden attribute)
-    if (node.hidden && node.frame === undefined) {
+    // Show hidden attribute if element is hidden, regardless of frame presence
+    if (node.hidden) {
         attrs.push(`hidden`);
     }
     if (node.match) attrs.push(`match`); // Mark matched elements
@@ -651,7 +586,7 @@ function treeToHtml(node: any, indent = 0): string {
                 const textContent = needsIndent ? "  ".repeat(indent + 1) + item : item;
                 contentHtml.push(textContent);
             } else {
-                const itemHtml = treeToHtml(item, indent + 1);
+                const itemHtml = treeToHtml(item as DomToken, indent + 1);
                 if (itemHtml) {
                     contentHtml.push(itemHtml);
                 }
@@ -722,7 +657,7 @@ export function registerDomTools(server: McpServer) {
 
             // Return appropriate format
             if (format === "html") {
-                const htmlOutput = tree && !(tree as { error?: string }).error ? treeToHtml(tree).trim() : "";
+                const htmlOutput = tree && !(tree as { error?: string }).error ? treeToHtml(tree as ElementToken).trim() : "";
                 if (tree && !(tree as { error?: string }).error) {
                     // Return HTML text directly
                     const content: Array<{ type: "text"; text: string } | { type: "image"; data: string; mimeType: string }> = [
@@ -832,7 +767,7 @@ export function registerDomTools(server: McpServer) {
             // Add hierarchy in requested format
             if (hierarchy) {
                 if (format === "html") {
-                    const hierarchyHtml = treeToHtml(hierarchy);
+                    const hierarchyHtml = treeToHtml(hierarchy as ElementToken);
                     if (hierarchyHtml) {
                         content.push({ type: "text", text: hierarchyHtml });
                     }

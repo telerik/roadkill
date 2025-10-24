@@ -1,14 +1,15 @@
 {
     "compilerOptions": {
         "target": "ESNext",
-        "module": "Node16",
-        "moduleResolution": "Node16",
+        "module": "ESNext",
+        "moduleResolution": "node",
         "sourceMap": true,
         "declaration": true,
         "outDir": "./",
         "skipLibCheck": true,
         "allowSyntheticDefaultImports": true,
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "allowImportingTsExtensions": false
     },
     "include": [
         "*.ts",

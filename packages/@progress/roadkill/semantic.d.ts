@@ -1,4 +1,4 @@
-import { Session, type Element as WebDriverElement } from "@progress/roadkill/webdriver.js";
+import { Session, type Element as WebDriverElement } from "@progress/roadkill/webdriver";
 type FinderSrc = {
     name: string;
     src: string;
