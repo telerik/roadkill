@@ -35,13 +35,13 @@ jobs:
       - name: npm install
         run: npm ci
       
-      # Build affected projects only
-      - name: build affected
-        run: npm run build:affected
+      # Build all projects
+      - name: build all
+        run: npm run build
       
-      # Test affected projects only  
-      - name: test affected
-        run: xvfb-run --auto-servernum npm run test:affected
+      # Test all projects  
+      - name: test all
+        run: xvfb-run --auto-servernum npm run test
       
       - name: npm pack
         run: npm pack --ws
