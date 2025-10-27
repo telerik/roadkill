@@ -15,7 +15,7 @@
   },
   "scripts": {
     "example": "cd packages/@progress/roadkill && npm i && node --enable-source-maps example.js",
-    "test": "nx run-many -t test",
+    "test": "nx run-many -t test --skip-nx-cache",
     "test:affected": "nx affected -t test",
     "build": "nx run-many -t prepare",
     "build:affected": "nx affected -t prepare",
