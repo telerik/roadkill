@@ -1,31 +1,37 @@
 {
-    "name": "roadkill",
-    "workspaces": [
-        "packages/@progress/roadkill",
-        "examples/jest-web",
-        "examples/selenium-interop"
-    ],
-    "engines": {
-        "node": "^18.17.0",
-        "npm": "^9.9.0"
-    },
-    "private": true,
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/telerik/roadkill.git"
-    },
-    "scripts": {
-        "example": "cd packages/@progress/roadkill && npm i && node --enable-source-maps example.js",
-        "test": "lerna run test",
-        "lerna:version": "lerna version --no-git-tag-version --no-push",
-        "lerna:publish": "lerna publish"
-    },
-    "files": [
-        "LICENSE",
-        "README.md",
-        "package.json"
-    ],
-    "devDependencies": {
-        "lerna": "^7.3.0"
-    }
+  "name": "roadkill",
+  "workspaces": [
+    "packages/@progress/roadkill",
+    "examples/test-website"
+  ],
+  "engines": {
+    "node": "^24.1.0",
+    "npm": "^11.3.0"
+  },
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/telerik/roadkill.git"
+  },
+  "scripts": {
+    "example": "cd packages/@progress/roadkill && npm i && node --enable-source-maps example.js",
+    "test": "nx run-many -t prepare --skip-nx-cache && nx run-many -t test --skip-nx-cache",
+    "test:affected": "nx affected -t test",
+    "build": "nx run-many -t prepare",
+    "build:affected": "nx affected -t prepare",
+    "graph": "nx graph",
+    "reset": "nx reset",
+    "release": "nx release",
+    "version": "nx release version",
+    "publish": "nx release publish"
+  },
+  "files": [
+    "LICENSE",
+    "README.md",
+    "package.json"
+  ],
+  "devDependencies": {
+    "@nx/js": "^22.0.1",
+    "nx": "22.0.1"
+  }
 }

@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "strict": true,
+    "outDir": "dist",
+    "skipLibCheck": true,
+    "noEmit": true,
+    "experimentalDecorators": true,
+    "allowImportingTsExtensions": false,
+
+    "jsx": "react",
+    "jsxFactory": "SemanticJSX.createElement",
+
+    "disableSourceOfProjectReferenceRedirect": true,
+    "preserveSymlinks": true,
+  },
+  "include": ["index.ts", "index.test.ts", "index.semantic.test.tsx"],
+  "exclude": ["node_modules/**"]
+}

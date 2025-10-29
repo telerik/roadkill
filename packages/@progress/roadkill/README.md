@@ -5,11 +5,18 @@
 
 A [node.js](https://nodejs.org/en) testing solution over the [WebDriver](https://www.w3.org/TR/webdriver2/) protocol. Will also consider [WebDriver BiDi](https://w3c.github.io/webdriver-bidi/).
 
+## Requirements
+
+- **Node.js 22+** (required for ECMAScript 2024 Explicit Resource Management)
+- **TypeScript 5.2+** (for native Disposable support)
+
 Powered by:
+ - [Vitest](https://vitest.dev) - Fast unit test framework
  - [TypeScript](https://www.typescriptlang.org)
  - [Promise based](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
  - [Errors with causes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause)
  - [AbortSignals](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal)
+ - [ECMAScript 2024 Explicit Resource Management](https://github.com/tc39/proposal-explicit-resource-management)
  - all the fancy tech...
 
 A [WebDriver](https://www.w3.org/TR/webdriver2/) based slim testing framework. Closes the gaps between QAs and Front-End developers by:
@@ -20,110 +27,150 @@ A [WebDriver](https://www.w3.org/TR/webdriver2/) based slim testing framework. C
  - Share the lightweight VSCode IDE
  - Compile-time type-checking
 
-## jest-environment
-The `@progress/roadkill` ships with a jest environment geared toward e2e.
+## Modern Resource Management
 
-To enable it set your jest environment in your jest config from the demo `package.json` to:
-``` JSON
+The `@progress/roadkill` uses ECMAScript 2024 Explicit Resource Management for automatic cleanup:
+
+### Per-Test Automatic Cleanup (Recommended)
+
+```typescript
+import { describe, it } from "vitest";
+import { WebDriverClient } from "@progress/roadkill";
+
+describe("my tests", () => {
+  it("automatically cleans up resources", async () => {
+    // Automatic cleanup with using declarations - preferred pattern
+    await using client = new WebDriverClient("http://localhost:4444");
+    await using session = await client.session({ browserName: "chrome" });
+    
+    await session.navigate("https://example.com");
+    // Resources automatically disposed when test completes
+  });
+});
+```
+
+### Suite-Level Manual Cleanup (When Needed)
+
+```typescript
+import { describe, it, beforeAll, afterAll } from "vitest";
+import { WebDriverClient } from "@progress/roadkill";
+
+describe("my test suite", () => {
+  let client: WebDriverClient;
+  let session: Session;
+
+  beforeAll(async () => {
+    // When constructed in beforeAll, manual disposal is required
+    client = new WebDriverClient("http://localhost:4444");
+    session = await client.session({ browserName: "chrome" });
+  });
+
+  afterAll(async () => {
+    // ECMAScript 2024 symbol-based disposal
+    await session?.[Symbol.asyncDispose]();
+    // Note: WebDriverClient doesn't need disposal, only sessions do
+  });
+
+  it("reuses session across tests", async () => {
+    await session.navigate("https://example.com");
+  });
+});
+```
+
+## Vitest Integration
+
+To set up testing with Vitest, add to your `package.json`:
+```json
 {
   "scripts": {
-    "test": "node --experimental-vm-modules ../../node_modules/jest/bin/jest.js --detectOpenHandles --forceExit"
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
-  "jest": {
-    "preset": "ts-jest/presets/default-esm",
-    "testEnvironment": "@progress/roadkill/jest-environment.ts",
+  "devDependencies": {
+    "vitest": "^1.6.1"
   }
 }
 ```
 
-The output will be printed on-the-go, and the `console.log` mocking will be disabled.
+## Context-Aware Signal Handling
 
-On test start and test done console.group will be put on stack, so console.logs could be easily referenced to a particular test.
+The framework provides context-aware WebDriver operations that automatically receive timeout and cancellation signals:
 
-Errors will be logged out with complete stack at the time of their appearance.
+```typescript
+import { describe, it } from "vitest";
+import { WebDriverClient } from "@progress/roadkill";
 
-The environment also adds support to detect test and hook state. Use `@progress/roadkill/utils.ts` to import `getState()`, that gives a test or hook bound `signal` that is fired before timeout. It also allows us to write up cleanup on fail:
+describe("signal handling", () => {
+  it("per-test automatic cleanup", async () => {
+    await using client = new WebDriverClient("http://localhost:4444");
+    await using session = await client.session({ browserName: "chrome" });
+    
+    // All operations automatically receive the test's AbortSignal
+    await session.navigate("https://example.com");
+    const element = await session.findElement("css selector", "h1");
+    await element.click(); // Will be cancelled if test times out
+    // Automatic cleanup when test ends
+  });
 
-``` TypeScript
-import { getState } from "@progress/roadkill/utils.js";
+  // Or with beforeAll/afterAll pattern
+  let sharedSession: Session;
+  
+  beforeAll(async () => {
+    const client = new WebDriverClient("http://localhost:4444");
+    sharedSession = await client.session({ browserName: "chrome" });
+  });
+  
+  afterAll(async () => {
+    await sharedSession?.[Symbol.asyncDispose](); // ECMAScript 2024 disposal
+  });
 
-afterEach(async () => {
-    const { signal, test, hook } = getState();
-    if (test && test.status == "fail") {
-        console.log("post-mortem collecting test failure artifacts for: " + test.names.join(" > "));
-        // For example try to capture screenshot from session...
-    }
+  it("shared session across tests", async () => {
+    await sharedSession.navigate("https://example.com");
+    // Still gets automatic signal handling
+  });
 });
 ```
 
-Example test run output log:
+The WebDriver client automatically inherits cancellation signals from the current test context, eliminating the need for manual signal management.
+
+## Example Output
+
+Example test run with automatic resource cleanup:
 ```
-Test Run
-  Run
-    w3schools
-      - w3schools > navigate to js statements page ... , at w3schools.test.ts:41:5
-        WebDriverMethodError: Failed to click element.
-            at Element.click (/Users/cankov/git/telerik/roadkill/packages/@progress/roadkill/webdriver.ts:1308:19)
-            at processTicksAndRejections (node:internal/process/task_queues:95:5)
-            ... 2 lines matching cause stack trace ...
-            at processTimers (node:internal/timers:507:7)
-            at Object.<anonymous> (/Users/cankov/git/telerik/roadkill/examples/jest-web/w3schools.test.ts:55:9) {
-          [cause]: WebDriverRequestError: WebDriver API call failed.
-              at WebDriverClient.request (/Users/cankov/git/telerik/roadkill/packages/@progress/roadkill/webdriver.ts:537:76)
-              at processTicksAndRejections (node:internal/process/task_queues:95:5)
-              ... 2 lines matching cause stack trace ...
-              at processTimers (node:internal/timers:507:7)
-              at Element.click (/Users/cankov/git/telerik/roadkill/packages/@progress/roadkill/webdriver.ts:1306:20)
-              at Object.<anonymous> (/Users/cankov/git/telerik/roadkill/examples/jest-web/w3schools.test.ts:55:9) {
-            address: 'http://localhost:5027',
-            command: 'POST /session/fb44c2e79fd1887be5d08a9be3374455/element/3D083E2E34E065F985F036327C7A6530_element_12/click',
-            sessionId: 'fb44c2e79fd1887be5d08a9be3374455',
-            elementId: '3D083E2E34E065F985F036327C7A6530_element_12',
-            [cause]: TestTimeout [Error]: Exceeded timeout of 20000 ms for a test.
-                at Object.fetch (node:internal/deps/undici/undici:14062:11)
-                at processTicksAndRejections (node:internal/process/task_queues:95:5)
-                at runNextTicks (node:internal/process/task_queues:64:3)
-                at listOnTimeout (node:internal/timers:533:9)
-                at processTimers (node:internal/timers:507:7)
-                at WebDriverClient.request (/Users/cankov/git/telerik/roadkill/packages/@progress/roadkill/webdriver.ts:525:30)
-                at Element.click (/Users/cankov/git/telerik/roadkill/packages/@progress/roadkill/webdriver.ts:1306:20)
-                at Object.<anonymous> (/Users/cankov/git/telerik/roadkill/examples/jest-web/w3schools.test.ts:55:9)
-          }
-        }
-      ✗ w3schools > navigate to js statements page (20.041sec.)
-      ◯ w3schools > pending test, at w3schools.test.ts:65:10
-      ✗ w3schools > timeouted test (205ms.), at w3schools.test.ts:68:5
-        Error: Delay was aborted.
-            at delay (/Users/cankov/git/telerik/roadkill/packages/@progress/roadkill/utils.ts:33:15)
-            at runNextTicks (node:internal/process/task_queues:60:5)
-            at listOnTimeout (node:internal/timers:533:9)
-            at processTimers (node:internal/timers:507:7)
-            at Object.<anonymous> (/Users/cankov/git/telerik/roadkill/examples/jest-web/w3schools.test.ts:69:9) {
-          [cause]: TestTimeout [Error]: Exceeded timeout of 200 ms for a test.
-              at Timeout._onTimeout (/Users/cankov/git/telerik/roadkill/packages/@progress/roadkill/jest-environment.ts:527:42)
-              at listOnTimeout (node:internal/timers:564:17)
-              at processTimers (node:internal/timers:507:7)
-        }
-      - afterAll, at w3schools.test.ts:30:5
-        post-mortem collecting test failure artifacts for: w3schools > timeouted test
-      ✓ afterAll
-      ✗ afterAll, at w3schools.test.ts:38:5
-        WebDriverRequestError: WebDriver API call failed.
-            at WebDriverClient.request (/Users/cankov/git/telerik/roadkill/packages/@progress/roadkill/webdriver.ts:537:76)
-            at processTicksAndRejections (node:internal/process/task_queues:95:5)
-            ... 2 lines matching cause stack trace ...
-            at processTimers (node:internal/timers:507:7)
-            at Object.<anonymous> (/Users/cankov/git/telerik/roadkill/examples/jest-web/w3schools.test.ts:38:26) {
-          address: 'http://localhost:5027',
-          command: 'DELETE /session/fb44c2e79fd1887be5d08a9be3374455',
-          sessionId: 'fb44c2e79fd1887be5d08a9be3374455',
-          [cause]: HookTimeout [Error]: Exceeded timeout of 5000 ms for a hook.
-              at Object.fetch (node:internal/deps/undici/undici:14062:11)
-              at processTicksAndRejections (node:internal/process/task_queues:95:5)
-              at runNextTicks (node:internal/process/task_queues:64:3)
-              at listOnTimeout (node:internal/timers:533:9)
-              at processTimers (node:internal/timers:507:7)
-              at WebDriverClient.request (/Users/cankov/git/telerik/roadkill/packages/@progress/roadkill/webdriver.ts:525:30)
-              at Object.<anonymous> (/Users/cankov/git/telerik/roadkill/examples/jest-web/w3schools.test.ts:38:26)
-        }
+✓ webdriver tests
+✓ automatic cleanup tests
+✓ context-aware signal tests
+
+Test Files  3 passed (3)
+Tests      12 passed (12)
+Duration   1.23s
 ```
+
+All WebDriver sessions and resources are automatically cleaned up using ECMAScript disposable patterns.
+
+## Model Context Protocol (MCP) Integration
+
+Roadkill includes a Model Context Protocol server that provides WebDriver automation tools to AI assistants like Claude Desktop.
+
+### VS Code MCP Configuration
+
+To use Roadkill's MCP server in VS Code with the Claude Desktop extension, add this configuration to your MCP settings:
+
+```json
+{
+  "mcpServers": {
+    "roadkill": {
+      "command": "npx",
+      "args": ["@progress/roadkill"]
+    }
+  }
+}
+```
+
+This provides access to ChromeDriver management, WebDriver session control, DOM exploration, and semantic page object discovery tools directly in your AI chat interface.
+
+**Available MCP Tools:**
+- **ChromeDriver**: `chromedriver.start`, `chromedriver.stop`, `chromedriver.status`, `chromedriver.restart`
+- **WebDriver**: Session management, navigation, element interaction, screenshots
+- **DOM Browser**: Page snapshots, selector testing, script execution
+- **Semantic Discovery**: Intelligent page object discovery and interaction

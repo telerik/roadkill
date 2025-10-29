@@ -1,5 +1,4 @@
 import EventEmitter from "events";
-import { Disposable, withImplicitSignal } from "./utils.js";
 import type { ChildProcessWithoutNullStreams } from "child_process";
 import treeKill from "tree-kill";
 import * as readline from "readline";
@@ -16,6 +15,11 @@ export interface ServerOptions {
      * A console.log prefix.
      */
     logPrefix?: string;
+
+    /**
+     * A console.log implementation.
+     */
+    log?: (line: string) => void;
 }
 
 /**
@@ -40,7 +44,7 @@ export interface ServerOptions {
  *  - ChromeDriver.exe
  *  - React dev server at: `react-scripts start`
  */
-export abstract class Server<Options extends ServerOptions> extends EventEmitter implements Disposable  {
+export abstract class Server<Options extends ServerOptions> extends EventEmitter implements Disposable, AsyncDisposable  {
 
     private _state: ServerState = "new";
 
@@ -74,12 +78,11 @@ export abstract class Server<Options extends ServerOptions> extends EventEmitter
 
     public get prefix() { return this.options?.logPrefix ?? "Server" }
 
-    public async start(signal?: AbortSignal, useImplicitSignal?: boolean) {
+    public async start(signal?: AbortSignal) {
         if (this.state != "new") throw new Error("Can only start once.");
         this.state = "starting";
 
         try {
-            signal = withImplicitSignal(signal, useImplicitSignal);
             signal?.throwIfAborted();
 
             this.process = this.spawn();
@@ -128,7 +131,7 @@ export abstract class Server<Options extends ServerOptions> extends EventEmitter
     }
 
     protected log(line: string) {
-        if (this.options.enableLogging) console.log(`${this.prefix ? "[" + this.prefix + "] " : ""}${line}`);
+        if (this.options.enableLogging) (this.options.log ?? console.log)(`${this.prefix ? "[" + this.prefix + "] " : ""}${line}`);
     }
 
     private onStdOut(line: string) {
@@ -179,7 +182,28 @@ export abstract class Server<Options extends ServerOptions> extends EventEmitter
         }
     }
 
-    public async dispose(): Promise<void> {
+    /**
+     * ECMAScript Explicit Resource Management implementation
+     */
+    public [Symbol.dispose](): void {
+        // For sync disposal, we can't await the async dispose
+        // Users should prefer using `await using` with Symbol.asyncDispose
+        this.killProcess().catch(() => {
+            // Silently handle disposal errors in sync context
+        });
+    }
+
+    /**
+     * ECMAScript Async Explicit Resource Management implementation
+     */
+    public async [Symbol.asyncDispose](): Promise<void> {
+        await this.killProcess();
+    }
+
+    /**
+     * Kill the process and wait for disposal
+     */
+    private async killProcess(): Promise<void> {
         if (this.state == "new") {
             this.state = "disposed";
         } if (this.state == "starting") {

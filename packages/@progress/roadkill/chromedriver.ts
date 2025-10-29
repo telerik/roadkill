@@ -1,6 +1,5 @@
 import { spawn, ChildProcessWithoutNullStreams, SpawnOptionsWithoutStdio } from "child_process";
 import { delimiter } from "path";
-import { URL } from "./utils.js";
 import { platform } from "os";
 import { Server, ServerOptions } from "./server.js";
 
@@ -47,7 +46,7 @@ export interface ChromeDriverOptions extends ServerOptions {
 export class ChromeDriver extends Server<ChromeDriverOptions> {
 
     private _port: undefined | number;
-    private _address: undefined | URL;
+    private _address: undefined | string;
 
     private startupLine: string[] = [];
     
@@ -73,20 +72,26 @@ export class ChromeDriver extends Server<ChromeDriverOptions> {
     protected override onLine(line: string): void {
         super.onLine(line);
 
-        if (this.state == "starting") {
-            if (this._port == undefined) {
-                const result = /Starting ChromeDriver.*on port (\d*)/.exec(line);
-                if (result) this._port = Number.parseInt(result[1]);
-            }
+        if (this.state !== "starting") return;
 
-            if (line == "ChromeDriver was started successfully.") {
-                this._address = `http://localhost:${this._port}`;
-                this.state = "running";
-                this.started();
-            }
+        const l = line.trim();
 
-            this.startupLine.push(line);
+        // Capture port if present anywhere in the line
+        if (this._port === undefined) {
+            const m = /on port\s+(\d+)/i.exec(l);
+            if (m) this._port = Number.parseInt(m[1], 10);
         }
+
+        // Transition to running when success message appears (with or without "on port ...")
+        if (/ChromeDriver was started successfully/i.test(l)) {
+            if (!this._address) {
+                const port = this._port ?? 9515; // fall back to known port if not parsed yet
+                this._address = `http://localhost:${port}`;
+            }
+            this.started(); // <-- this sets state = "running" when in "starting"
+        }
+
+        this.startupLine.push(l);
     }
 
     protected override startingErrorOnClose(code: number): Error {

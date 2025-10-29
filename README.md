@@ -7,11 +7,18 @@
 
 A [node.js](https://nodejs.org/en) testing solution over the [WebDriver](https://www.w3.org/TR/webdriver2/) protocol. Will also consider [WebDriver BiDi](https://w3c.github.io/webdriver-bidi/).
 
+## Requirements
+
+- **Node.js 22+** (required for ECMAScript 2024 Explicit Resource Management)
+- **TypeScript 5.2+** (for native Disposable support)
+
 Powered by:
+ - [Vitest](https://vitest.dev) - Fast unit test framework
  - [TypeScript](https://www.typescriptlang.org)
  - [Promise based](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise)
  - [Errors with causes](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/cause)
  - [AbortSignals](https://developer.mozilla.org/en-US/docs/Web/API/AbortSignal)
+ - [ECMAScript 2024 Explicit Resource Management](https://github.com/tc39/proposal-explicit-resource-management)
  - all the fancy tech...
 
 A [WebDriver](https://www.w3.org/TR/webdriver2/) based slim testing framework. Closes the gaps between QAs and Front-End developers by:
@@ -19,8 +26,21 @@ A [WebDriver](https://www.w3.org/TR/webdriver2/) based slim testing framework. C
  - Sharing the same TypeScript or JavaScript language with ***Angular***, ***React*** and ***Vue*** front-end developers
  - Stay within the [nodejs](https://nodejs.org/en) ecosystem
  - Skill-transfer between QAs and Front-End devs
- - Share the lightweight VSCode IDE
- - Compile-time type-checking
+ - **ECMAScript 2024 Only** - Pure symbol-based disposables, no legacy methods
+ - **Node.js 22+ Required** - Cutting-edge JavaScript runtime features
+ - **Zero Backward Compatibility** - Clean slate approach
+
+## AI-Powered DOM Analysis
+
+Roadkill includes advanced DOM snapshot capabilities designed for AI assistants like GitHub Copilot. The `dom-snapshot` and `dom-test-selector` tools provide comprehensive page structure analysis to help craft robust selectors:
+
+- **`dom-snapshot`**: Captures complete DOM structure with element positioning, visibility states, and semantic information
+- **`dom-test-selector`**: Tests CSS/XPath selectors and shows element hierarchy with matches, parents, and children
+- **AI Integration**: Optimized for Copilot to understand page layout and suggest stable, maintainable selectors
+- **Intelligent Filtering**: Automatically excludes non-essential elements (style, script tags) for cleaner analysis
+- **Multiple Formats**: Supports both HTML and JSON output formats for different AI processing needs
+
+**Note**: Large HTML pages may trigger chat summarization in AI assistants due to content length limits. For complex pages, consider using specific root selectors to focus analysis on relevant sections.
 
 ## Demo
 To run the demo code, clone the repo, execute the ***[./packages/@progress/roadkill/example.ts](./packages/@progress/roadkill/example.ts)*** by running:
