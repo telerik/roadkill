@@ -86,8 +86,16 @@ jobs:
           DISPLAY: :99
       
       # Nx handles versioning and publishing with semantic versioning
-      - name: nx release
+      - name: nx release version
         run: npm run release
+        env:
+          NPM_TOKEN: ${{ steps.import-secrets.outputs.NPM_TOKEN }}
+          GH_TOKEN: ${{ steps.import-secrets.outputs.GH_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ steps.import-secrets.outputs.NPM_TOKEN }}
+      
+      # Publish the packages to npm
+      - name: nx release publish
+        run: npm run publish
         env:
           NPM_TOKEN: ${{ steps.import-secrets.outputs.NPM_TOKEN }}
           GH_TOKEN: ${{ steps.import-secrets.outputs.GH_TOKEN }}
