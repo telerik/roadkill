@@ -10,14 +10,15 @@ jobs:
     timeout-minutes: 10
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0  # Needed for Nx affected commands
-      - uses: actions/setup-node@v3
+
+      - uses: actions/setup-node@v6
         with:
           node-version: ^24.1
           cache: 'npm'
-      
+
       # Setup Nx cache for faster builds
       - name: Setup Nx cache
         uses: actions/cache@v3
@@ -28,12 +29,12 @@ jobs:
           key: ${{ runner.os }}-nx-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-nx-
-      
+
       - name: install virtual display
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb fluxbox x11-utils
-      
+
       - name: setup virtual display
         run: |
           # Start Xvfb with full HD resolution
@@ -47,23 +48,23 @@ jobs:
           xdpyinfo -display :99 | grep dimensions
         env:
           DISPLAY: :99
-      
+
       - name: npm install
         run: npm ci
-      
+
       # Build all projects
       - name: build all
         run: npm run build
-      
-      # Test all projects  
+
+      # Test all projects
       - name: test all
         run: npm run test
         env:
           DISPLAY: :99
-      
+
       - name: npm pack
         run: npm pack --ws
-      
+
       - name: upload artefacts
         uses: actions/upload-artifact@v4
         with:
