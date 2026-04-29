@@ -78,7 +78,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       # Publish the packages to npm
-      - name: nx release publish
-        run: npm run publish
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Semantic Release
+        uses: telerik/actions/semantic-release@master
+        with:
+          token: ${{ github.token }}
