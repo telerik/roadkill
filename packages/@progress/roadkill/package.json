@@ -32,6 +32,17 @@
         "typescript": "^5.2.2",
         "vitest": "^3.2.0"
     },
+    "main": "./index.js",
+    "exports": {
+        ".": "./index.js",
+        "./express.js": "./express.js",
+        "./chromedriver.js": "./chromedriver.js",
+        "./webdriver.js": "./webdriver.js",
+        "./semantic.js": "./semantic.js",
+        "./semantic-jsx.js": "./semantic-jsx.js",
+        "./server.js": "./server.js",
+        "./utils.js": "./utils.js"
+    },
     "engines": {
         "node": ">=22.0.0"
     },
