@@ -19,20 +19,18 @@ jobs:
           git config --global user.email "kendo-bot@progress.com"
           git config --global user.name "kendo-bot"
 
-      - name: git checkout
-        uses: actions/checkout@v6
+      - uses: telerik/actions/checkout@master
         with:
-          token: ${{ steps.import-secrets.outputs.GH_TOKEN }}
           fetch-depth: 0  # Needed for Nx affected commands and release
 
-      - uses: actions/setup-node@v6
+      - uses: telerik/actions/setup-node@master
         with:
           node-version: ^24.1
           cache: 'npm'
 
       # Setup Nx cache for faster builds
       - name: Setup Nx cache
-        uses: actions/cache@v3
+        uses: actions/cache@v5
         with:
           path: |
             node_modules/.cache/nx
@@ -80,7 +78,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
 
       # Publish the packages to npm
-      - name: nx release publish
-        run: npm run publish
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Semantic Release
+        uses: telerik/actions/semantic-release@master
+        with:
+          token: ${{ github.token }}
