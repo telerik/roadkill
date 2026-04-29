@@ -22,7 +22,6 @@ jobs:
       - name: git checkout
         uses: actions/checkout@v6
         with:
-          token: ${{ steps.import-secrets.outputs.GH_TOKEN }}
           fetch-depth: 0  # Needed for Nx affected commands and release
 
       - uses: actions/setup-node@v6
