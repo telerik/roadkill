@@ -1,4 +1,3 @@
-
 class StepError extends Error {
 }
 
@@ -15,7 +14,6 @@ global.console = Object.setPrototypeOf({
         super.log(...arguments);
     }
 }, baseConsole);
-
 
 /**
  * Formats duration given in milliseconds to user friendly string.
